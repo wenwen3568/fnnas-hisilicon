@@ -85,7 +85,6 @@ jobs:
       - name: Determine kernel branch
         id: kernel_branch
         run: |
-          # Convert 6.6.y -> v6.6, 6.12.y -> v6.12, etc.
           KERNEL_VER="${{ github.event.inputs.kernel_version }}"
           BRANCH="v${KERNEL_VER%.y}"
           echo "branch=$BRANCH" >> $GITHUB_OUTPUT
@@ -105,19 +104,29 @@ jobs:
           git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
           cd linux
           
-          # Apply Hi3798MV100 patches
+          # Apply Hi3798MV100 patches - FAIL ON ERROR
+          echo "=== Applying Hi3798MV100 patches ==="
           for patch in ${{ github.workspace }}/kernel/patches/*.patch; do
             if [[ -f "$patch" ]]; then
               echo "Applying $(basename "$patch")..."
-              patch -p1 < "$patch" || echo "Warning: Patch may have issues"
+              patch -p1 < "$patch" || { echo "FAILED to apply $(basename "$patch")"; exit 1; }
             fi
           done
           
+          # Verify patch application
+          echo "=== Verifying patch application ==="
+          grep -r "hi3798mv100" drivers/clk/hisilicon/crg-hi3798.c | head -5 || echo "Warning: MV100 not found in crg driver"
+          
           cp ${{ github.workspace }}/kernel/config-hi3798mv100 .config
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install
+          
+          # Show critical configs
+          echo "=== Critical configs ==="
+          grep -E "CONFIG_(ACPI|CLK_HI3798|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC)" .config | sort
+          
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -20
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -10
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -10
       
       - name: Build U-Boot
         run: |
@@ -161,7 +170,6 @@ jobs:
           sudo cp build/dtb/hi3798mv100-ec6100v9c.dtb "$rootfs/boot/dtb/hisilicon/"
           sudo rsync -a build/kernel/rootfs/lib/modules/ "$rootfs/lib/modules/"
           
-          # Update boot config
           if [[ -f "$rootfs/boot/extlinux.conf" ]]; then
             sudo sed -i 's|fdt /boot/dtb/.*|fdt /boot/dtb/hisilicon/hi3798mv100-ec6100v9c.dtb|' "$rootfs/boot/extlinux.conf"
             sudo sed -i 's|linux /boot/Image|linux /boot/Image.gz|' "$rootfs/boot/extlinux.conf"
