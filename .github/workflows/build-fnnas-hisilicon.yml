@@ -82,6 +82,14 @@ jobs:
             rsync \
             patch
       
+      - name: Determine kernel branch
+        id: kernel_branch
+        run: |
+          # Convert 6.6.y -> v6.6, 6.12.y -> v6.12, etc.
+          KERNEL_VER="${{ github.event.inputs.kernel_version }}"
+          BRANCH="v${KERNEL_VER%.y}"
+          echo "branch=$BRANCH" >> $GITHUB_OUTPUT
+      
       - name: Download base fnOS image
         run: |
           mkdir -p build/base
@@ -94,7 +102,7 @@ jobs:
         run: |
           mkdir -p build/kernel
           cd build/kernel
-          git clone --depth=1 --branch "v${{ github.event.inputs.kernel_version %.* }}" https://github.com/torvalds/linux linux
+          git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
           cd linux
           
           # Apply Hi3798MV100 patches
