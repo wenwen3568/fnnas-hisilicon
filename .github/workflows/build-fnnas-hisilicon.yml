@@ -1,0 +1,242 @@
+name: Build FnNAS Hi3798MV100 Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_version:
+        description: 'Kernel version (e.g., 6.6.y, 6.12.y)'
+        required: true
+        default: '6.6.y'
+        type: choice
+        options:
+          - '6.6.y'
+          - '6.12.y'
+          - '6.18.y'
+      board:
+        description: 'Target board'
+        required: true
+        default: 'ec6100v9c'
+        type: choice
+        options:
+          - 'ec6100v9c'
+      rootfs_size:
+        description: 'Rootfs size in MiB'
+        required: true
+        default: '6144'
+      rootfs_expand:
+        description: 'Rootfs auto-expand size in GiB'
+        required: true
+        default: '16'
+      builder_name:
+        description: 'Builder signature'
+        required: false
+        default: 'fnnas-hisilicon'
+        type: string
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  build:
+    name: Build FnNAS Hi3798MV100 Image
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up build environment
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            make \
+            bc \
+            bison \
+            flex \
+            libssl-dev \
+            libelf-dev \
+            device-tree-compiler \
+            u-boot-tools \
+            parted \
+            dosfstools \
+            e2fsprogs \
+            btrfs-progs \
+            xz-utils \
+            curl \
+            wget \
+            git \
+            python3 \
+            python3-pip \
+            qemu-user-static \
+            binfmt-support \
+            debootstrap \
+            debian-archive-keyring \
+            cpio \
+            zstd \
+            lz4 \
+            pigz \
+            rsync \
+            patch
+      
+      - name: Download base fnOS image
+        run: |
+          mkdir -p build/base
+          cd build/base
+          wget -c "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.xz" -O fnnas-base.img.xz
+          xz -d -k fnnas-base.img.xz
+          echo "FNOS_BASE_IMAGE=$(pwd)/fnnas-base.img" >> $GITHUB_ENV
+      
+      - name: Build Linux kernel with Hi3798MV100 patches
+        run: |
+          mkdir -p build/kernel
+          cd build/kernel
+          git clone --depth=1 --branch "v${{ github.event.inputs.kernel_version %.* }}" https://github.com/torvalds/linux linux
+          cd linux
+          
+          # Apply Hi3798MV100 patches
+          for patch in ${{ github.workspace }}/kernel/patches/*.patch; do
+            if [[ -f "$patch" ]]; then
+              echo "Applying $(basename "$patch")..."
+              patch -p1 < "$patch" || echo "Warning: Patch may have issues"
+            fi
+          done
+          
+          cp ${{ github.workspace }}/kernel/config-hi3798mv100 .config
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install
+      
+      - name: Build U-Boot
+        run: |
+          mkdir -p build/uboot
+          cd build/uboot
+          git clone --depth=1 https://github.com/u-boot/u-boot u-boot
+          cd u-boot
+          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi arch/arm/dts/
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- hi3798cv200_defconfig
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j$(nproc)
+      
+      - name: Build Device Tree Blobs
+        run: |
+          mkdir -p build/dtb
+          cd build/kernel/linux
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- hi3798mv100-ec6100v9c.dtb
+          cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../dtb/
+          
+          cd ../../uboot/u-boot
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- hi3798mv100-ec6100v9c.dtb
+          cp hi3798mv100-ec6100v9c.dtb ../dtb/u-boot-ec6100v9c.dtb
+      
+      - name: Extract base fnOS image
+        run: |
+          mkdir -p build/extract
+          cd build/extract
+          loop_dev=$(sudo losetup -fP --show $FNOS_BASE_IMAGE)
+          mkdir -p boot root
+          sudo mount "${loop_dev}p1" boot
+          sudo mount "${loop_dev}p2" root -t btrfs -o compress=zstd:1
+          sudo rsync -a root/ ../rootfs/
+          sudo umount root boot
+          sudo losetup -d $loop_dev
+      
+      - name: Replace kernel and DTB
+        run: |
+          rootfs="build/rootfs"
+          sudo mv "$rootfs/boot/Image.gz" "$rootfs/boot/Image.gz.bak" 2>/dev/null || true
+          sudo cp build/kernel/linux/arch/arm64/boot/Image.gz "$rootfs/boot/Image.gz"
+          sudo mkdir -p "$rootfs/boot/dtb/hisilicon"
+          sudo cp build/dtb/hi3798mv100-ec6100v9c.dtb "$rootfs/boot/dtb/hisilicon/"
+          sudo rsync -a build/kernel/rootfs/lib/modules/ "$rootfs/lib/modules/"
+          
+          # Update boot config
+          if [[ -f "$rootfs/boot/extlinux.conf" ]]; then
+            sudo sed -i 's|fdt /boot/dtb/.*|fdt /boot/dtb/hisilicon/hi3798mv100-ec6100v9c.dtb|' "$rootfs/boot/extlinux.conf"
+            sudo sed -i 's|linux /boot/Image|linux /boot/Image.gz|' "$rootfs/boot/extlinux.conf"
+          fi
+          if [[ -f "$rootfs/boot/uEnv.txt" ]]; then
+            sudo sed -i 's|fdtfile=.*|fdtfile=hisilicon/hi3798mv100-ec6100v9c.dtb|' "$rootfs/boot/uEnv.txt"
+          fi
+      
+      - name: Create final image
+        run: |
+          mkdir -p out
+          image_name="fnos_hisilicon_ec6100v9c_$(date +%Y%m%d_%H%M%S).img"
+          image_path="out/$image_name"
+          total_size_mb=$((512 + ${{ github.event.inputs.rootfs_size }} + 100))
+          
+          dd if=/dev/zero of="$image_path" bs=1M count=$total_size_mb status=progress
+          parted -s "$image_path" mklabel gpt
+          parted -s "$image_path" mkpart primary fat32 1MiB $((512 + 1))MiB
+          parted -s "$image_path" set 1 boot on
+          parted -s "$image_path" set 1 esp on
+          parted -s "$image_path" name 1 "BOOT"
+          parted -s "$image_path" mkpart primary btrfs $((512 + 1))MiB 100%
+          parted -s "$image_path" name 2 "ROOTFS"
+          
+          loop_dev=$(sudo losetup -fP --show "$image_path")
+          sudo mkfs.vfat -F 32 -n "BOOT" "${loop_dev}p1"
+          sudo mkfs.btrfs -L "ROOTFS" "${loop_dev}p2"
+          
+          mkdir -p build/image_mnt/boot build/image_mnt/root
+          sudo mount "${loop_dev}p1" build/image_mnt/boot
+          sudo mount "${loop_dev}p2" build/image_mnt/root -o compress=zstd:1
+          
+          sudo rsync -a build/rootfs/boot/ build/image_mnt/boot/
+          sudo rsync -a --exclude=/boot build/rootfs/ build/image_mnt/root/
+          sudo mkdir -p build/image_mnt/root/boot
+          
+          sudo umount build/image_mnt/boot build/image_mnt/root
+          sudo losetup -d $loop_dev
+          
+          xz -T0 -9 "$image_path"
+          sha256sum "${image_path}.xz" > "${image_path}.xz.sha256"
+          
+          echo "IMAGE_PATH=${image_path}.xz" >> $GITHUB_ENV
+          echo "IMAGE_SHA256=$(cat ${image_path}.xz.sha256 | cut -d' ' -f1)" >> $GITHUB_ENV
+      
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fnnas-hisilicon-ec6100v9c-${{ github.event.inputs.kernel_version }}
+          path: out/*.img.xz*
+          retention-days: 30
+      
+      - name: Create Release
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: fnnas-hisilicon-ec6100v9c-${{ github.event.inputs.kernel_version }}-${{ github.run_number }}
+          name: "FnNAS Hi3798MV100 EC6100V9C - Kernel ${{ github.event.inputs.kernel_version }}"
+          body: |
+            FnNAS image for EC6100V9C STB with Hi3798MV100 SoC
+            
+            **Hardware:**
+            - SoC: HiSilicon Hi3798MV100 (4x Cortex-A7 @ 1.5GHz)
+            - RAM: 1GB DDR3
+            - Flash: 8GB eMMC
+            - Ethernet: 1x 100Mbps
+            - USB: 2x USB 2.0
+            
+            **Software:**
+            - Kernel: ${{ github.event.inputs.kernel_version }} + Hi3798MV100 patches (David Yang v7)
+            - Base: fnOS ARM64 (Debian-based)
+            - Builder: ${{ github.event.inputs.builder_name }}
+            
+            **Installation:**
+            1. Download the `.img.xz` file
+            2. Decompress: `xz -d fnnas_hisilicon_ec6100v9c_*.img.xz`
+            3. Write to USB/SD: `sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress`
+            4. Boot from USB/SD on EC6100V9C
+            5. Run `fnnas-install` to install to eMMC
+            
+            **Checksum:** ${{ env.IMAGE_SHA256 }}
+          files: out/*.img.xz*
+          draft: false
+          prerelease: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
