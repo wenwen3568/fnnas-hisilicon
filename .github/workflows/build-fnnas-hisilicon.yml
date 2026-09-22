@@ -108,33 +108,13 @@ jobs:
           cd build/kernel/linux
           
           # 1. Add MV100 clock IDs after HI3798CV200_COMBPHY0_MUX
-          sed -i '/#define HI3798CV200_COMBPHY0_MUX.*86/a\
- #define HI3798_FIXED_3M\t\t87\n\
- #define HI3798_FIXED_15M\t\t88\n\
- #define HI3798_FIXED_83P3M\t\t89' drivers/clk/hisilicon/crg-hi3798cv200.c
+          sed -i '/#define HI3798CV200_COMBPHY0_MUX.*86/a #define HI3798_FIXED_3M\t\t87\n#define HI3798_FIXED_15M\t\t88\n#define HI3798_FIXED_83P3M\t\t89' drivers/clk/hisilicon/crg-hi3798cv200.c
           
           # 2. Add MV100 match table entries before MODULE_DEVICE_TABLE
-          sed -i '/MODULE_DEVICE_TABLE(of, hi3798cv200_crg_match_table)/i\
- \t{ .compatible = "hisilicon,hi3798mv100-crg",\n\
- \t\t.data = &hi3798cv200_crg_funcs },\n\
- \t{ .compatible = "hisilicon,hi3798mv100-sysctrl",\n\
- \t\t.data = &hi3798cv200_sysctrl_funcs },' drivers/clk/hisilicon/crg-hi3798cv200.c
+          sed -i '/MODULE_DEVICE_TABLE(of, hi3798cv200_crg_match_table)/i \        { .compatible = "hisilicon,hi3798mv100-crg",\n        .data = &hi3798cv200_crg_funcs },\n        { .compatible = "hisilicon,hi3798mv100-sysctrl",\n        .data = &hi3798cv200_sysctrl_funcs },' drivers/clk/hisilicon/crg-hi3798cv200.c
           
           # 3. Add DT bindings clock IDs
-          sed -i '/#define HISTB_USB3_SUSPEND_CLK1.*50/a\
- #define HISTB_USB2_UTMI_CLK1\t\t51\n\
- #define HISTB_USB2_2_BUS_CLK\t\t52\n\
- #define HISTB_USB2_2_PHY_CLK\t\t53\n\
- #define HISTB_USB2_2_UTMI_CLK\t\t54\n\
- #define HISTB_USB2_2_UTMI_CLK1\t\t55\n\
- #define HISTB_USB2_2_12M_CLK\t\t56\n\
- #define HISTB_USB2_2_48M_CLK\t\t57\n\
- #define HISTB_USB2_2_OTG_UTMI_CLK\t58\n\
- #define HISTB_USB2_2_PHY1_REF_CLK\t59\n\
- #define HISTB_USB2_2_PHY2_REF_CLK\t60\n\
- #define HISTB_FEPHY_CLK\t\t\t61\n\
- #define HISTB_GPU_BUS_CLK\t\t62\n\
- #define HISTB_GPU_CORE_CLK\t\t63' include/dt-bindings/clock/histb-clock.h
+          sed -i '/#define HISTB_USB3_SUSPEND_CLK1.*50/a #define HISTB_USB2_UTMI_CLK1\t\t51\n#define HISTB_USB2_2_BUS_CLK\t\t52\n#define HISTB_USB2_2_PHY_CLK\t\t53\n#define HISTB_USB2_2_UTMI_CLK\t\t54\n#define HISTB_USB2_2_UTMI_CLK1\t\t55\n#define HISTB_USB2_2_12M_CLK\t\t56\n#define HISTB_USB2_2_48M_CLK\t\t57\n#define HISTB_USB2_2_OTG_UTMI_CLK\t58\n#define HISTB_USB2_2_PHY1_REF_CLK\t59\n#define HISTB_USB2_2_PHY2_REF_CLK\t60\n#define HISTB_FEPHY_CLK\t\t\t61\n#define HISTB_GPU_BUS_CLK\t\t62\n#define HISTB_GPU_CORE_CLK\t\t63' include/dt-bindings/clock/histb-clock.h
           
           # Verify changes
           echo "=== Verifying MV100 clock IDs ==="
