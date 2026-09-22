@@ -97,36 +97,65 @@ jobs:
           xz -d -k fnnas-base.img.xz
           echo "FNOS_BASE_IMAGE=$(pwd)/fnnas-base.img" >> $GITHUB_ENV
       
-      - name: Build Linux kernel with Hi3798MV100 patches
+      - name: Clone Linux kernel
         run: |
           mkdir -p build/kernel
           cd build/kernel
           git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
-          cd linux
+      
+      - name: Apply Hi3798MV100 modifications (using sed)
+        run: |
+          cd build/kernel/linux
           
-          # Apply Hi3798MV100 patches - FAIL ON ERROR
-          echo "=== Applying Hi3798MV100 patches ==="
-          for patch in ${{ github.workspace }}/kernel/patches/*.patch; do
-            if [[ -f "$patch" ]]; then
-              echo "Applying $(basename "$patch")..."
-              patch -p1 < "$patch" || { echo "FAILED to apply $(basename "$patch")"; exit 1; }
-            fi
-          done
+          # 1. Add MV100 clock IDs after HI3798CV200_COMBPHY0_MUX
+          sed -i '/#define HI3798CV200_COMBPHY0_MUX.*86/a\
+ #define HI3798_FIXED_3M\t\t87\n\
+ #define HI3798_FIXED_15M\t\t88\n\
+ #define HI3798_FIXED_83P3M\t\t89' drivers/clk/hisilicon/crg-hi3798cv200.c
           
-          # Verify patch application
-          echo "=== Verifying patch application ==="
-          grep -r "hi3798mv100" drivers/clk/hisilicon/crg-hi3798.c | head -5 || echo "Warning: MV100 not found in crg driver"
+          # 2. Add MV100 match table entries before MODULE_DEVICE_TABLE
+          sed -i '/MODULE_DEVICE_TABLE(of, hi3798cv200_crg_match_table)/i\
+ \t{ .compatible = "hisilicon,hi3798mv100-crg",\n\
+ \t\t.data = &hi3798cv200_crg_funcs },\n\
+ \t{ .compatible = "hisilicon,hi3798mv100-sysctrl",\n\
+ \t\t.data = &hi3798cv200_sysctrl_funcs },' drivers/clk/hisilicon/crg-hi3798cv200.c
           
+          # 3. Add DT bindings clock IDs
+          sed -i '/#define HISTB_USB3_SUSPEND_CLK1.*50/a\
+ #define HISTB_USB2_UTMI_CLK1\t\t51\n\
+ #define HISTB_USB2_2_BUS_CLK\t\t52\n\
+ #define HISTB_USB2_2_PHY_CLK\t\t53\n\
+ #define HISTB_USB2_2_UTMI_CLK\t\t54\n\
+ #define HISTB_USB2_2_UTMI_CLK1\t\t55\n\
+ #define HISTB_USB2_2_12M_CLK\t\t56\n\
+ #define HISTB_USB2_2_48M_CLK\t\t57\n\
+ #define HISTB_USB2_2_OTG_UTMI_CLK\t58\n\
+ #define HISTB_USB2_2_PHY1_REF_CLK\t59\n\
+ #define HISTB_USB2_2_PHY2_REF_CLK\t60\n\
+ #define HISTB_FEPHY_CLK\t\t\t61\n\
+ #define HISTB_GPU_BUS_CLK\t\t62\n\
+ #define HISTB_GPU_CORE_CLK\t\t63' include/dt-bindings/clock/histb-clock.h
+          
+          # Verify changes
+          echo "=== Verifying MV100 clock IDs ==="
+          grep -n "HI3798_FIXED_" drivers/clk/hisilicon/crg-hi3798cv200.c
+          echo "=== Verifying match table ==="
+          grep -A2 "hi3798mv100" drivers/clk/hisilicon/crg-hi3798cv200.c
+          echo "=== Verifying DT bindings ==="
+          grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU" include/dt-bindings/clock/histb-clock.h
+      
+      - name: Build Linux kernel
+        run: |
+          cd build/kernel/linux
           cp ${{ github.workspace }}/kernel/config-hi3798mv100 .config
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           
-          # Show critical configs
           echo "=== Critical configs ==="
-          grep -E "CONFIG_(ACPI|CLK_HI3798|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC)" .config | sort
+          grep -E "CONFIG_(ACPI|COMMON_CLK_HI3798CV200|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC)" .config | sort
           
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -20
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -10
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -10
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -30
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
       - name: Build U-Boot
         run: |
@@ -239,7 +268,7 @@ jobs:
             - USB: 2x USB 2.0
             
             **Software:**
-            - Kernel: ${{ github.event.inputs.kernel_version }} + Hi3798MV100 patches (David Yang v7)
+            - Kernel: ${{ github.event.inputs.kernel_version }} + Hi3798MV100 support
             - Base: fnOS ARM64 (Debian-based)
             - Builder: ${{ github.event.inputs.builder_name }}
             
