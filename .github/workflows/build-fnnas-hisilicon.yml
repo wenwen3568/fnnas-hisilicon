@@ -139,14 +139,33 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
-      - name: Build U-Boot
+      - name: Build U-Boot (using generic ARM defconfig)
         run: |
           mkdir -p build/uboot
           cd build/uboot
           git clone --depth=1 https://github.com/u-boot/u-boot u-boot
           cd u-boot
+          
+          # Copy our DTS files
           cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi arch/arm/dts/
-          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- hi3798cv200_defconfig
+          
+          # Use generic ARM Cortex-A7 defconfig (am335x_evm_defconfig works for Cortex-A8, close to A7)
+          # We'll create a minimal defconfig inline
+          make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- am335x_evm_defconfig
+          
+          # Enable required options for HiSilicon
+          ./scripts/config --enable ARCH_HISILICON
+          ./scripts/config --enable ARCH_HI3798
+          ./scripts/config --enable OF_CONTROL
+          ./scripts/config --enable OF_BOARD_SETUP
+          ./scripts/config --enable DM
+          ./scripts/config --enable DM_REGULATOR
+          ./scripts/config --enable DM_REGULATOR_FIXED
+          ./scripts/config --enable SERIAL
+          ./scripts/config --enable SYS_MALLOC_F_LEN=0x200000
+          ./scripts/config --enable BOOTDELAY=3
+          ./scripts/config --enable CONSOLE_SERIAL
+          
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j$(nproc)
       
       - name: Build Device Tree Blobs
