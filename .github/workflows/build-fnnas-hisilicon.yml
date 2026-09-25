@@ -106,12 +106,12 @@ jobs:
           cd build/kernel
           git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
       
-      - name: Copy DTS file and build DTB using kernel build system
+      - name: Copy DTS file and add to kernel Makefile
         run: |
           mkdir -p build/kernel/linux/arch/arm64/boot/dts/hisilicon
           cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
           
-          # Add our DTS to kernel Makefile
+          # Add our DTS to kernel Makefile so it gets built
           echo 'dtb-$(CONFIG_ARCH_HISILICON) += hi3798mv100-ec6100v9c.dtb' >> build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
           
           # Verify DTS file exists
@@ -197,8 +197,8 @@ jobs:
           mkdir -p build/dtb
           cd build/kernel/linux
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- dtbs 2>&1 | tail -15
+          ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
           cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../dtb/
-          ls -la ../dtb/hi3798mv100-ec6100v9c.dtb
           
           cd ../../uboot/u-boot
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- hi3798mv100-ec6100v9c.dtb
