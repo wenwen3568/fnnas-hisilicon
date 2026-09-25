@@ -106,13 +106,16 @@ jobs:
           cd build/kernel
           git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
       
-      - name: Copy DTS file and add to kernel Makefile
+      - name: Copy DTS file and build DTB directly
         run: |
           mkdir -p build/kernel/linux/arch/arm64/boot/dts/hisilicon
           cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
-          # Add our DTS to kernel Makefile so it gets built
-          echo 'dtb-$(CONFIG_ARCH_HISILICON) += hi3798mv100-ec6100v9c.dtb' >> build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
-          ls -la build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
+          
+          # Use dtc directly to compile DTB from DTS
+          cd build/kernel/linux
+          dtc -I dts -O dtb -o hi3798mv100-ec6100v9c.dtb arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
+          cp hi3798mv100-ec6100v9c.dtb ../dtb/
+          ls -la ../dtb/hi3798mv100-ec6100v9c.dtb
       
       - name: Apply Hi3798MV100 modifications (using sed)
         run: |
@@ -145,7 +148,6 @@ jobs:
           grep -E "CONFIG_(ACPI|COMMON_CLK_HI3798CV200|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC)" .config | sort
           
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -30
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
       - name: Clone U-Boot
@@ -189,16 +191,13 @@ jobs:
           
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j$(nproc)
       
-      - name: Build Device Tree Blobs
+      - name: Build U-Boot DTB
         run: |
           mkdir -p build/dtb
-          cd build/kernel/linux
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- dtbs 2>&1 | tail -15
-          cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../dtb/
-          
-          cd ../../uboot/u-boot
+          cd build/uboot/u-boot
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- hi3798mv100-ec6100v9c.dtb
           cp hi3798mv100-ec6100v9c.dtb ../dtb/u-boot-ec6100v9c.dtb
+          ls -la ../dtb/u-boot-ec6100v9c.dtb
       
       - name: Extract base fnOS image
         run: |
