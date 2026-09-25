@@ -140,7 +140,7 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
-      - name: Build U-Boot (using generic ARM defconfig)
+      - name: Build U-Boot (using generic ARM defconfig, disable SPL)
         run: |
           mkdir -p build/uboot
           cd build/uboot
@@ -165,6 +165,13 @@ jobs:
           ./scripts/config --enable SYS_MALLOC_F_LEN=0x200000
           ./scripts/config --enable BOOTDELAY=3
           ./scripts/config --enable CONSOLE_SERIAL
+          
+          # Disable SPL to avoid SRAM overflow
+          ./scripts/config --disable SPL
+          ./scripts/config --disable SPL_NAND_SUPPORT
+          ./scripts/config --disable SPL_MMC_SUPPORT
+          ./scripts/config --disable SPL_SERIAL_SUPPORT
+          ./scripts/config --disable SPL_YMODEM_SUPPORT
           
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- -j$(nproc)
       
