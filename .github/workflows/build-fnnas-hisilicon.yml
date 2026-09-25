@@ -112,18 +112,6 @@ jobs:
           cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
           ls -la build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
       
-      - name: Clone U-Boot
-        run: |
-          mkdir -p build/uboot
-          cd build/uboot
-          git clone --depth=1 https://github.com/u-boot/u-boot u-boot
-      
-      - name: Copy U-Boot DTS
-        run: |
-          mkdir -p build/uboot/u-boot/arch/arm/dts
-          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi build/uboot/u-boot/arch/arm/dts/
-          ls -la build/uboot/u-boot/arch/arm/dts/hi3798mv100-ec6100v9c-u-boot.dtsi
-      
       - name: Apply Hi3798MV100 modifications (using sed)
         run: |
           cd build/kernel/linux
@@ -158,6 +146,18 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
+      - name: Clone U-Boot
+        run: |
+          mkdir -p build/uboot
+          cd build/uboot
+          git clone --depth=1 https://github.com/u-boot/u-boot u-boot
+      
+      - name: Copy U-Boot DTS
+        run: |
+          mkdir -p build/uboot/u-boot/arch/arm/dts
+          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi build/uboot/u-boot/arch/arm/dts/
+          ls -la build/uboot/u-boot/arch/arm/dts/hi3798mv100-ec6100v9c-u-boot.dtsi
+      
       - name: Build U-Boot (disable SPL)
         run: |
           cd build/uboot/u-boot
@@ -191,7 +191,9 @@ jobs:
         run: |
           mkdir -p build/dtb
           cd build/kernel/linux
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- hi3798mv100-ec6100v9c.dtb
+          # Build all DTBs for arm64
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- dtbs 2>&1 | tail -15
+          # Copy our specific DTB
           cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../dtb/
           
           cd ../../uboot/u-boot
