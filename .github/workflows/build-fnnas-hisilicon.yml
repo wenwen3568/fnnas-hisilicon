@@ -83,7 +83,8 @@ jobs:
             pigz \
             rsync \
             patch \
-            libgnutls28-dev
+            libgnutls28-dev \
+            libgnutls-dev
       
       - name: Determine kernel branch
         id: kernel_branch
@@ -150,7 +151,7 @@ jobs:
           # Copy our DTS files
           cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi arch/arm/dts/
           
-          # Use generic ARM Cortex-A7 defconfig (am335x_evm_defconfig works for Cortex-A8, close to A7)
+          # Use generic ARM Cortex-A7 defconfig
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- am335x_evm_defconfig
           
           # Enable required options for HiSilicon
