@@ -137,6 +137,10 @@ jobs:
           grep -A2 "hi3798mv100" drivers/clk/hisilicon/crg-hi3798cv200.c
           echo "=== Verifying DT bindings ==="
           grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU" include/dt-bindings/clock/histb-clock.h
+          
+          # Verify Makefile entry
+          echo "=== Verifying Makefile entry ==="
+          grep "hi3798mv100" arch/arm64/boot/dts/hisilicon/Makefile
       
       - name: Build Linux kernel
         run: |
@@ -144,11 +148,18 @@ jobs:
           cp ${{ github.workspace }}/kernel/config-hi3798mv100 .config
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
           
+          # Force enable ARCH_HISILICON to ensure DTB gets built
+          ./scripts/config --enable CONFIG_ARCH_HISILICON
+          
           echo "=== Critical configs ==="
-          grep -E "CONFIG_(ACPI|COMMON_CLK_HI3798CV200|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC)" .config | sort
+          grep -E "CONFIG_(ACPI|COMMON_CLK_HI3798CV200|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC|ARCH_HISILICON)" .config | sort
           
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -30
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -30
+          
+          # Verify DTB was generated
+          ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
+          
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
       - name: Clone U-Boot
@@ -196,7 +207,7 @@ jobs:
         run: |
           mkdir -p build/dtb
           cd build/kernel/linux
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- dtbs 2>&1 | tail -15
+          # Verify DTB was generated
           ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
           cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../dtb/
           
