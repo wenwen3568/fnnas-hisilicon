@@ -106,18 +106,23 @@ jobs:
           cd build/kernel
           git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
       
+      - name: Copy DTS file to kernel source
+        run: |
+          mkdir -p build/kernel/linux/arch/arm64/boot/dts/hisilicon
+          cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
+          ls -la build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
+      
       - name: Clone U-Boot
         run: |
           mkdir -p build/uboot
           cd build/uboot
           git clone --depth=1 https://github.com/u-boot/u-boot u-boot
       
-      - name: Copy DTS files to kernel and U-Boot source
+      - name: Copy U-Boot DTS
         run: |
-          # Copy Linux DTS to kernel source
-          cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
-          # Copy U-Boot DTS to U-Boot source
+          mkdir -p build/uboot/u-boot/arch/arm/dts
           cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi build/uboot/u-boot/arch/arm/dts/
+          ls -la build/uboot/u-boot/arch/arm/dts/hi3798mv100-ec6100v9c-u-boot.dtsi
       
       - name: Apply Hi3798MV100 modifications (using sed)
         run: |
