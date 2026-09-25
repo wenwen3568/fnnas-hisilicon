@@ -83,8 +83,7 @@ jobs:
             pigz \
             rsync \
             patch \
-            libgnutls28-dev \
-            libgnutls-dev
+            libgnutls28-dev
       
       - name: Determine kernel branch
         id: kernel_branch
