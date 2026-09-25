@@ -106,6 +106,19 @@ jobs:
           cd build/kernel
           git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux linux
       
+      - name: Clone U-Boot
+        run: |
+          mkdir -p build/uboot
+          cd build/uboot
+          git clone --depth=1 https://github.com/u-boot/u-boot u-boot
+      
+      - name: Copy DTS files to kernel and U-Boot source
+        run: |
+          # Copy Linux DTS to kernel source
+          cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
+          # Copy U-Boot DTS to U-Boot source
+          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi build/uboot/u-boot/arch/arm/dts/
+      
       - name: Apply Hi3798MV100 modifications (using sed)
         run: |
           cd build/kernel/linux
@@ -127,13 +140,6 @@ jobs:
           echo "=== Verifying DT bindings ==="
           grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU" include/dt-bindings/clock/histb-clock.h
       
-      - name: Copy DTS files to kernel source
-        run: |
-          # Copy our DTS to kernel source for DTB compilation
-          cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
-          # Also copy U-Boot DTS
-          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi build/uboot/u-boot/arch/arm/dts/
-      
       - name: Build Linux kernel
         run: |
           cd build/kernel/linux
@@ -149,10 +155,7 @@ jobs:
       
       - name: Build U-Boot (disable SPL)
         run: |
-          mkdir -p build/uboot
-          cd build/uboot
-          git clone --depth=1 https://github.com/u-boot/u-boot u-boot
-          cd u-boot
+          cd build/uboot/u-boot
           
           # Use generic ARM Cortex-A7 defconfig
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- am335x_evm_defconfig
