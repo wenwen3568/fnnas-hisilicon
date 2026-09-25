@@ -154,8 +154,11 @@ jobs:
           echo "=== Critical configs ==="
           grep -E "CONFIG_(ACPI|COMMON_CLK_HI3798CV200|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC|ARCH_HISILICON)" .config | sort
           
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -30
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -30
+          # Build kernel image first
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -50
+          
+          # Then build DTBs with full output
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -50
           
           # Verify DTB was generated
           ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
@@ -313,7 +316,7 @@ jobs:
             **Installation:**
             1. Download the `.img.xz` file
             2. Decompress: `xz -d fnnas_hisilicon_ec6100v9c_*.img.xz`
-            3. Write to USB/SD: `sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress`
+            2. Write to USB/SD: `sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress`
             4. Boot from USB/SD on EC6100V9C
             5. Run `fnnas-install` to install to eMMC
             
