@@ -127,6 +127,13 @@ jobs:
           echo "=== Verifying DT bindings ==="
           grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU" include/dt-bindings/clock/histb-clock.h
       
+      - name: Copy DTS files to kernel source
+        run: |
+          # Copy our DTS to kernel source for DTB compilation
+          cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
+          # Also copy U-Boot DTS
+          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi build/uboot/u-boot/arch/arm/dts/
+      
       - name: Build Linux kernel
         run: |
           cd build/kernel/linux
@@ -140,15 +147,12 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -15
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tail -15
       
-      - name: Build U-Boot (using generic ARM defconfig, disable SPL)
+      - name: Build U-Boot (disable SPL)
         run: |
           mkdir -p build/uboot
           cd build/uboot
           git clone --depth=1 https://github.com/u-boot/u-boot u-boot
           cd u-boot
-          
-          # Copy our DTS files
-          cp ${{ github.workspace }}/uboot/hi3798mv100-ec6100v9c-u-boot.dtsi arch/arm/dts/
           
           # Use generic ARM Cortex-A7 defconfig
           make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- am335x_evm_defconfig
