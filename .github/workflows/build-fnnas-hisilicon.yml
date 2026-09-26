@@ -154,11 +154,27 @@ jobs:
           echo "=== Critical configs ==="
           grep -E "CONFIG_(ACPI|COMMON_CLK_HI3798CV200|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC|ARCH_HISILICON)" .config | sort
           
-          # Build kernel image first
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -50
+          # Build kernel image - capture full output to file for debugging
+          echo "=== Building kernel Image.gz ==="
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tee build_image.log | tail -100
+          BUILD_RESULT=${PIPESTATUS[0]}
           
-          # Then build DTBs with full output
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -100
+          if [ $BUILD_RESULT -ne 0 ]; then
+            echo "=== BUILD FAILED - Last 200 lines of build log ==="
+            tail -200 build_image.log
+            exit 1
+          fi
+          
+          # Then build DTBs
+          echo "=== Building DTBs ==="
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tee build_dtbs.log | tail -100
+          DTB_RESULT=${PIPESTATUS[0]}
+          
+          if [ $DTB_RESULT -ne 0 ]; then
+            echo "=== DTB BUILD FAILED - Last 200 lines ==="
+            tail -200 build_dtbs.log
+            exit 1
+          fi
           
           # Verify DTB was generated
           ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
@@ -316,7 +332,7 @@ jobs:
             **Installation:**
             1. Download the `.img.xz` file
             2. Decompress: `xz -d fnnas_hisilicon_ec6100v9c_*.img.xz`
-            2. Write to USB/SD: `sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress`
+            3. Write to USB/SD: `sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress`
             4. Boot from USB/SD on EC6100V9C
             5. Run `fnnas-install` to install to eMMC
             
