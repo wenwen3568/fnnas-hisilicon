@@ -158,7 +158,7 @@ jobs:
           make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) Image.gz 2>&1 | tail -50
           
           # Then build DTBs with full output
-          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -50
+          make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tail -100
           
           # Verify DTB was generated
           ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
