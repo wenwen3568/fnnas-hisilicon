@@ -135,6 +135,9 @@ jobs:
         # Verify Makefile entry
 
         echo "=== Makefile entry ==="
+echo "=== Full Makefile content ==="
+cat build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
+
 
         grep -n "hi3798mv100-ec6100v9c" build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
 
