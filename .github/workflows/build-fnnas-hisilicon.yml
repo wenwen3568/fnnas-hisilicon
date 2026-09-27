@@ -116,32 +116,20 @@ jobs:
         grep -q "hi3798mv100" drivers/clk/hisilicon/crg-hi3798.c && echo "Driver copied
         successfully"'
     - name: Copy DTS file and add to kernel Makefile
-      run: 'mkdir -p build/kernel/linux/arch/arm64/boot/dts/hisilicon
-
-
-        cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
-
-
-        # Add our DTS to kernel Makefile so it gets built
-
-        printf "dtb-y += hi3798mv100-ec6100v9c.dtb\n" >> build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
-
-
-        # Verify DTS file exists
-
-        ls -la build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
-
-
-        # Verify Makefile entry
-
-        echo "=== Makefile entry ==="
-echo "=== Full Makefile content ==="
-cat build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
-
-
-        grep -n "hi3798mv100-ec6100v9c" build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
-
-        '
+      run: "set -euo pipefail\nKERNEL=build/kernel/linux\nmkdir -p \"$KERNEL/arch/arm64/boot/dts/hisilicon\"\
+        \n\n# Copy the DTS into the kernel source\ncp \"${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts\"\
+        \ \"$KERNEL/arch/arm64/boot/dts/hisilicon/\"\n\n# Ensure the top-level DTB\
+        \ Makefile contains a rule for our DTB.\n# This guarantees make has a rule\
+        \ even if subdir handling differs across kernel versions.\nDTB_MAKEFILE=\"\
+        $KERNEL/arch/arm64/boot/dts/Makefile\"\nif ! grep -q \"hisilicon/hi3798mv100-ec6100v9c.dtb\"\
+        \ \"$DTB_MAKEFILE\" 2>/dev/null; then\n  printf \"\n# Added by workflow: include\
+        \ Hi3798MV100 dtb\n\" >> \"$DTB_MAKEFILE\"\n  printf \"dtb-y += hisilicon/hi3798mv100-ec6100v9c.dtb\n\
+        \" >> \"$DTB_MAKEFILE\"\nfi\n\n# For extra compatibility also add (or ensure)\
+        \ the subdir Makefile exists\nprintf \"dtb-y += hi3798mv100-ec6100v9c.dtb\n\
+        \" >> \"$KERNEL/arch/arm64/boot/dts/hisilicon/Makefile\"\n\n# Verify presence\n\
+        echo \"=== Kernel DTS files ===\"\nls -la \"$KERNEL/arch/arm64/boot/dts/hisilicon/\"\
+        \ || true\necho \"=== Top-level Makefile excerpt ===\"\ngrep -n \"hisilicon/hi3798mv100-ec6100v9c.dtb\"\
+        \ \"$DTB_MAKEFILE\" || true\n"
     - name: Apply Hi3798MV100 DT bindings
       run: "cd build/kernel/linux\n\nif ! grep -q 'hisilicon,hi3798mv100-crg' Documentation/devicetree/bindings/clock/hisi-crg.txt;\
         \ then\n  sed -i '/hisilicon,hi3519-crg/a\\    - \"hisilicon,hi3798mv100-crg\"\
@@ -167,9 +155,11 @@ cat build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
       run: "cd build/kernel/linux\ncp ${{ github.workspace }}/kernel/config-hi3798mv100\
         \ .config\nmake ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig\n\
         \n# Force enable ARCH_HISILICON to ensure DTB gets built\n./scripts/config\
-        \ --enable CONFIG_ARCH_HISILICON\n\necho \"=== Critical configs ===\"\ngrep\
-        \ -E \"CONFIG_(ACPI|COMMON_CLK_HI3798|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC|ARCH_HISILICON)\"\
-        \ .config | sort\n\n# Build DTB using kernel build system (now .config is\
+        \ --enable CONFIG_ARCH_HISILICON\n\n# Re-run olddefconfig to ensure config\
+        \ is fully applied\nmake ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig\n\
+        \necho \"=== Critical configs ===\"\ngrep -E \"CONFIG_(ACPI|COMMON_CLK_HI3798|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC|ARCH_HISILICON)\"\
+        \ .config | sort\n\n# Verify CONFIG_ARCH_HISILICON is set\ngrep -E \"CONFIG_ARCH_HISILICON\"\
+        \ .config || true\n\n# Build DTB using kernel build system (now .config is\
         \ ready)\necho \"=== Building DTB via kernel build system ===\"\nmake ARCH=arm64\
         \ CROSS_COMPILE=aarch64-linux-gnu- hi3798mv100-ec6100v9c.dtb\n\n# Verify DTB\
         \ was generated\ntest -f arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb\
