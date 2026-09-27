@@ -128,7 +128,24 @@ jobs:
 
         # Verify DTS file exists
 
-        ls -la build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts'
+        ls -la build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
+
+
+        # Verify Makefile entry
+
+        echo "=== Makefile entry ==="
+
+        grep -n "hi3798mv100-ec6100v9c" build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
+
+
+        # Verify DTS syntax with dtc
+
+        echo "=== Testing DTS syntax ==="
+
+        dtc -I dts -O dtb -o /dev/null build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
+        2>&1 || echo "DTS syntax check failed - see errors above"
+
+        '
     - name: Apply Hi3798MV100 DT bindings
       run: "cd build/kernel/linux\n\nif ! grep -q 'hisilicon,hi3798mv100-crg' Documentation/devicetree/bindings/clock/hisi-crg.txt;\
         \ then\n  sed -i '/hisilicon,hi3519-crg/a\\    - \"hisilicon,hi3798mv100-crg\"\
