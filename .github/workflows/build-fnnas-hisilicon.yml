@@ -80,10 +80,13 @@ jobs:
         linux'
     - name: Apply Hi3798MV100 kernel patches
       run: "cd build/kernel/linux\n\n# Apply Hi3798MV100 patches in order (0002, 0003)\
-        \ - skip 0001 (rename patch, not needed for 6.6)\nfor patch in ${{ github.workspace\
-        \ }}/kernel/patches/0002-*.patch; do\n  echo \"Applying $patch\"\n  patch\
-        \ -p1 --forward < \"$patch\" || { echo \"Failed to apply $patch\"; exit 1;\
-        \ }\ndone\nfor patch in ${{ github.workspace }}/kernel/patches/0003-*.patch;\
+        \ - skip 0001 (rename patch, not needed for 6.6)\n# Skip 0002-dt-bindings*\
+        \ since DT bindings are handled separately\nfor patch in ${{ github.workspace\
+        \ }}/kernel/patches/0002-*.patch; do\n  base=$(basename \"$patch\")\n  if\
+        \ [[ \"$base\" == 0002-dt-bindings* ]]; then\n    echo \"Skipping $patch (dt-bindings\
+        \ handled separately)\"\n    continue\n  fi\n  echo \"Applying $patch\"\n\
+        \  patch -p1 --forward < \"$patch\" || { echo \"Failed to apply $patch\";\
+        \ exit 1; }\ndone\nfor patch in ${{ github.workspace }}/kernel/patches/0003-*.patch;\
         \ do\n  echo \"Applying $patch\"\n  patch -p1 --forward < \"$patch\" || {\
         \ echo \"Failed to apply $patch\"; exit 1; }\ndone\n\n# Verify patches applied\n\
         echo \"=== Verifying patches applied ===\"\nls -la drivers/clk/hisilicon/\n\
