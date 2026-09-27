@@ -255,8 +255,8 @@ jobs:
         ./scripts/config --enable DM_REGULATOR
         ./scripts/config --enable DM_REGULATOR_FIXED
         ./scripts/config --enable SERIAL
-        ./scripts/config --enable SYS_MALLOC_F_LEN=0x200000
-        ./scripts/config --enable BOOTDELAY=3
+        ./scripts/config --set-val SYS_MALLOC_F_LEN 0x200000
+        ./scripts/config --set-val BOOTDELAY 3
         ./scripts/config --enable CONSOLE_SERIAL
         # Disable SPL to avoid SRAM overflow
         ./scripts/config --disable SPL
