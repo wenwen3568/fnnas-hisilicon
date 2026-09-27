@@ -274,6 +274,15 @@ static const struct hisi_gate_clock hi3798mv100_gate_clks[] = {
 	/* FEPHY */
 	{ HISTB_FEPHY_CLK, "clk_fephy", "25m",
 		CLK_SET_RATE_PARENT, 0x120, 0, 0, },
+	/* Watchdog */
+	{ HISTB_WDT_CLK, "clk_wdt", "24m",
+		CLK_SET_RATE_PARENT, 0x1a0, 0, 0, },
+	/* RTC */
+	{ HISTB_RTC_CLK, "clk_rtc", "32k",
+		CLK_SET_RATE_PARENT, 0x1a4, 0, 0, },
+	/* Thermal */
+	{ HISTB_THERMAL_CLK, "clk_thermal", "24m",
+		CLK_SET_RATE_PARENT, 0x1a8, 0, 0, },
 };
 
 static const struct hi3798_complex_clock hi3798mv100_complex_clks[] = {
