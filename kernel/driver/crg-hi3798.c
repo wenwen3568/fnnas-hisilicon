@@ -283,6 +283,12 @@ static const struct hisi_gate_clock hi3798mv100_gate_clks[] = {
 	/* Thermal */
 	{ HISTB_THERMAL_CLK, "clk_thermal", "24m",
 		CLK_SET_RATE_PARENT, 0x1a8, 0, 0, },
+	/* Crypto */
+	{ HISTB_CRYPTO_CLK, "clk_crypto", "200m",
+		CLK_SET_RATE_PARENT, 0x1ac, 0, 0, },
+	/* VPU */
+	{ HISTB_VPU_CLK, "clk_vpu", "200m",
+		CLK_SET_RATE_PARENT, 0x1b0, 0, 0, },
 };
 
 static const struct hi3798_complex_clock hi3798mv100_complex_clks[] = {
