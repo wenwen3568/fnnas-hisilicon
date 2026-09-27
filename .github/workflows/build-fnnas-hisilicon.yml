@@ -118,6 +118,7 @@ jobs:
     - name: Copy DTS file and add to kernel Makefile
       run: 'mkdir -p build/kernel/linux/arch/arm64/boot/dts/hisilicon
 
+
         cp ${{ github.workspace }}/dtb/hi3798mv100-ec6100v9c.dts build/kernel/linux/arch/arm64/boot/dts/hisilicon/
 
 
@@ -138,12 +139,20 @@ jobs:
         grep -n "hi3798mv100-ec6100v9c" build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
 
 
-        # Verify DTS syntax with dtc
+        # CORRECT way: Use kernel build system to compile DTB (handles #include via
+        preprocessing)
 
-        echo "=== Testing DTS syntax ==="
+        echo "=== Building DTB via kernel build system ==="
 
-        dtc -I dts -O dtb -o /dev/null build/kernel/linux/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts
-        2>&1 || echo "DTS syntax check failed - see errors above"
+        cd build/kernel/linux
+
+        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- hi3798mv100-ec6100v9c.dtb
+
+
+        # Verify DTB was generated
+
+        test -f arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb && echo "DTB
+        generated successfully" || { echo "DTB generation failed"; exit 1; }
 
         '
     - name: Apply Hi3798MV100 DT bindings
