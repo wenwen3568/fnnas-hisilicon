@@ -271,11 +271,11 @@ jobs:
         cd build/kernel/linux
         # Verify DTB was generated
         ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
-        cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../dtb/
+        cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../../../dtb/
         cd ../../uboot/u-boot
         make ARCH=arm CROSS_COMPILE=arm-linux-gnueabihf- hi3798mv100-ec6100v9c.dtb
-        cp hi3798mv100-ec6100v9c.dtb ../dtb/u-boot-ec6100v9c.dtb
-        ls -la ../dtb/u-boot-ec6100v9c.dtb
+        cp hi3798mv100-ec6100v9c.dtb ../../dtb/u-boot-ec6100v9c.dtb
+        ls -la ../../dtb/u-boot-ec6100v9c.dtb
     - name: Extract base fnOS image
       run: |
         mkdir -p build/extract
