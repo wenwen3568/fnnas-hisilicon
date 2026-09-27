@@ -79,18 +79,42 @@ jobs:
         git clone --depth=1 --branch "${{ steps.kernel_branch.outputs.branch }}" https://github.com/torvalds/linux
         linux'
     - name: Apply Hi3798MV100 kernel patches
-      run: "cd build/kernel/linux\n\n# Apply Hi3798MV100 patches in order (0002, 0003)\
-        \ - skip 0001 (rename patch, not needed for 6.6)\n# Skip 0002-dt-bindings*\
-        \ since DT bindings are handled separately\nfor patch in ${{ github.workspace\
-        \ }}/kernel/patches/0002-*.patch; do\n  base=$(basename \"$patch\")\n  if\
-        \ [[ \"$base\" == 0002-dt-bindings* ]]; then\n    echo \"Skipping $patch (dt-bindings\
-        \ handled separately)\"\n    continue\n  fi\n  echo \"Applying $patch\"\n\
-        \  patch -p1 --forward < \"$patch\" || { echo \"Failed to apply $patch\";\
-        \ exit 1; }\ndone\nfor patch in ${{ github.workspace }}/kernel/patches/0003-*.patch;\
-        \ do\n  echo \"Applying $patch\"\n  patch -p1 --forward < \"$patch\" || {\
-        \ echo \"Failed to apply $patch\"; exit 1; }\ndone\n\n# Verify patches applied\n\
-        echo \"=== Verifying patches applied ===\"\nls -la drivers/clk/hisilicon/\n\
-        grep -r \"hi3798mv100\" drivers/clk/hisilicon/ || true"
+      run: "cd build/kernel/linux\n\n# Apply Hi3798MV100 patches - skip 0001 (rename,\
+        \ not needed for 6.6)\n# Skip 0002-dt-bindings* and 0003-clk* - both handled\
+        \ separately below\nfor patch in ${{ github.workspace }}/kernel/patches/0002-*.patch;\
+        \ do\n  base=$(basename \"$patch\")\n  if [[ \"$base\" == 0002-dt-bindings*\
+        \ ]]; then\n    echo \"Skipping $patch (dt-bindings handled separately)\"\n\
+        \    continue\n  fi\n  echo \"Applying $patch\"\n  patch -p1 --forward < \"\
+        $patch\" || { echo \"Failed to apply $patch\"; exit 1; }\ndone\nfor patch\
+        \ in ${{ github.workspace }}/kernel/patches/0003-*.patch; do\n  base=$(basename\
+        \ \"$patch\")\n  if [[ \"$base\" == 0003-clk* ]]; then\n    echo \"Skipping\
+        \ $patch (CRG driver handled separately)\"\n    continue\n  fi\n  echo \"\
+        Applying $patch\"\n  patch -p1 --forward < \"$patch\" || { echo \"Failed to\
+        \ apply $patch\"; exit 1; }\ndone\n\n# Verify patches applied\necho \"===\
+        \ Verifying patches applied ===\"\nls -la drivers/clk/hisilicon/\ngrep -r\
+        \ \"hi3798mv100\" drivers/clk/hisilicon/ || true"
+    - name: Copy Hi3798MV100 CRG driver
+      run: 'cd build/kernel/linux
+
+
+        # Copy the CRG driver from repo
+
+        mkdir -p drivers/clk/hisilicon
+
+        cp ${{ github.workspace }}/kernel/driver/crg-hi3798.c drivers/clk/hisilicon/
+
+
+        # Add the new driver to Makefile
+
+        echo "obj-\$(CONFIG_COMMON_CLK_HI3798) += crg-hi3798.o" >> drivers/clk/hisilicon/Makefile
+
+
+        # Verify driver file copied
+
+        ls -la drivers/clk/hisilicon/crg-hi3798.c
+
+        grep -q "hi3798mv100" drivers/clk/hisilicon/crg-hi3798.c && echo "Driver copied
+        successfully"'
     - name: Copy DTS file and add to kernel Makefile
       run: 'mkdir -p build/kernel/linux/arch/arm64/boot/dts/hisilicon
 
@@ -245,7 +269,7 @@ jobs:
       run: "rootfs=\"build/rootfs\"\nsudo mv \"$rootfs/boot/Image.gz\" \"$rootfs/boot/Image.gz.bak\"\
         \ 2>/dev/null || true\nsudo cp build/kernel/linux/arch/arm64/boot/Image.gz\
         \ \"$rootfs/boot/Image.gz\"\nsudo mkdir -p \"$rootfs/boot/dtb/hisilicon\"\n\
-        sudo cp build/dtb/hi3798mv100-ec6100v9c.dts \"$rootfs/boot/dtb/hisilicon/\"\
+        sudo cp build/dtb/hi3798mv100-ec6100v9c.dtb \"$rootfs/boot/dtb/hisilicon/\"\
         \nsudo rsync -a build/kernel/rootfs/lib/modules/ \"$rootfs/lib/modules/\"\n\
         \nif [[ -f \"$rootfs/boot/extlinux.conf\" ]]; then\n  sudo sed -i 's|fdt /boot/dtb/.*|fdt\
         \ /boot/dtb/hisilicon/hi3798mv100-ec6100v9c.dtb|' \"$rootfs/boot/extlinux.conf\"\
