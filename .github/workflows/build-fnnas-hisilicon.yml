@@ -139,7 +139,7 @@ jobs:
       run: "cd build/kernel/linux\n\nif ! grep -q 'hisilicon,hi3798mv100-crg' Documentation/devicetree/bindings/clock/hisi-crg.txt;\
         \ then\n  sed -i '/hisilicon,hi3519-crg/a\\\\    - \"hisilicon,hi3798mv100-crg\"\
         \\\\\\n    - \"hisilicon,hi3798mv100-sysctrl\"' \\\n    Documentation/devicetree/bindings/clock/hisi-crg.txt\n\
-        fi\n\nif ! grep -q 'HISTB_USB2_UTMI_CLK1' include/dt-bindings/clock/histb-clock.h;\
+        fi\n\nif ! grep -q 'HISTB_VPU_CLK' include/dt-bindings/clock/histb-clock.h;\
         \ then\n  awk '\n    /HISTB_USB3_SUSPEND_CLK1/ {\n      print\n      print\
         \ \"#define HISTB_USB2_UTMI_CLK1\\t\\t51\"\n      print \"#define HISTB_USB2_2_BUS_CLK\\\
         t\\t52\"\n      print \"#define HISTB_USB2_2_PHY_CLK\\t\\t53\"\n      print\
