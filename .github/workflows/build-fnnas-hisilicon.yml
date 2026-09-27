@@ -1,5 +1,5 @@
 name: Build FnNAS Hi3798MV100 Image
-true:
+'on':
   workflow_dispatch:
     inputs:
       kernel_version:
