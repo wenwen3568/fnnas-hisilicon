@@ -23,10 +23,12 @@ on:
         description: 'Rootfs size in MiB'
         required: true
         default: '6144'
+        type: string
       rootfs_expand:
         description: 'Rootfs auto-expand size in GiB'
         required: true
         default: '16'
+        type: string
       builder_name:
         description: 'Builder signature'
         required: false
@@ -186,9 +188,7 @@ jobs:
           cd build/kernel/linux
           
           if ! grep -q 'hisilicon,hi3798mv100-crg' Documentation/devicetree/bindings/clock/hisi-crg.txt; then
-            sed -i '/hisilicon,hi3519-crg/a\
-    - "hisilicon,hi3798mv100-crg"\
-    - "hisilicon,hi3798mv100-sysctrl"' \
+            sed -i '/hisilicon,hi3519-crg/a\\    - "hisilicon,hi3798mv100-crg"\\\n    - "hisilicon,hi3798mv100-sysctrl"' \
               Documentation/devicetree/bindings/clock/hisi-crg.txt
           fi
           
