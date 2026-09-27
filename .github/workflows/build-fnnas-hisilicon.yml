@@ -138,22 +138,6 @@ jobs:
 
         grep -n "hi3798mv100-ec6100v9c" build/kernel/linux/arch/arm64/boot/dts/hisilicon/Makefile
 
-
-        # CORRECT way: Use kernel build system to compile DTB (handles #include via
-        preprocessing)
-
-        echo "=== Building DTB via kernel build system ==="
-
-        cd build/kernel/linux
-
-        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- hi3798mv100-ec6100v9c.dtb
-
-
-        # Verify DTB was generated
-
-        test -f arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb && echo "DTB
-        generated successfully" || { echo "DTB generation failed"; exit 1; }
-
         '
     - name: Apply Hi3798MV100 DT bindings
       run: "cd build/kernel/linux\n\nif ! grep -q 'hisilicon,hi3798mv100-crg' Documentation/devicetree/bindings/clock/hisi-crg.txt;\
@@ -182,18 +166,23 @@ jobs:
         \n# Force enable ARCH_HISILICON to ensure DTB gets built\n./scripts/config\
         \ --enable CONFIG_ARCH_HISILICON\n\necho \"=== Critical configs ===\"\ngrep\
         \ -E \"CONFIG_(ACPI|COMMON_CLK_HI3798|RESET_HISI|MMC_DW_HISI|HISI_GMAC|PSCI|GIC|ARCH_HISILICON)\"\
-        \ .config | sort\n\n# Build kernel image - capture FULL output to file\necho\
-        \ \"=== Building kernel Image.gz ===\"\nmake ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-\
+        \ .config | sort\n\n# Build DTB using kernel build system (now .config is\
+        \ ready)\necho \"=== Building DTB via kernel build system ===\"\nmake ARCH=arm64\
+        \ CROSS_COMPILE=aarch64-linux-gnu- hi3798mv100-ec6100v9c.dtb\n\n# Verify DTB\
+        \ was generated\ntest -f arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb\
+        \ && echo \"DTB generated successfully\" || { echo \"DTB generation failed\"\
+        ; exit 1; }\n\n# Build kernel image - capture FULL output to file\necho \"\
+        === Building kernel Image.gz ===\"\nmake ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-\
         \ -j$(nproc) Image.gz 2>&1 | tee build_image.log\nBUILD_RESULT=${PIPESTATUS[0]}\n\
         \nif [ $BUILD_RESULT -ne 0 ]; then\n  echo \"=== BUILD FAILED - FULL BUILD\
-        \ LOG ===\"\n  cat build_image.log\n  exit 1\nfi\n\n# Then build DTBs\necho\
-        \ \"=== Building DTBs ===\"\nmake ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu-\
-        \ -j$(nproc) dtbs 2>&1 | tee build_dtbs.log\nDTB_RESULT=${PIPESTATUS[0]}\n\
-        \nif [ $DTB_RESULT -ne 0 ]; then\n  echo \"=== DTB BUILD FAILED - FULL LOG\
-        \ ===\"\n  cat build_dtbs.log\n  exit 1\nfi\n\n# Verify DTB was generated\n\
-        ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb\n\nmake ARCH=arm64\
-        \ CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install\
-        \ 2>&1 | tail -15"
+        \ LOG ===\"\n  cat build_image.log\n  exit 1\nfi\n\n# Then build DTBs (for\
+        \ all other Hisilicon DTBs)\necho \"=== Building all DTBs ===\"\nmake ARCH=arm64\
+        \ CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs 2>&1 | tee build_dtbs.log\n\
+        DTB_RESULT=${PIPESTATUS[0]}\n\nif [ $DTB_RESULT -ne 0 ]; then\n  echo \"===\
+        \ DTB BUILD FAILED - FULL LOG ===\"\n  cat build_dtbs.log\n  exit 1\nfi\n\n\
+        # Verify our DTB was generated\nls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb\n\
+        \nmake ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs\
+        \ modules_install 2>&1 | tail -15\n"
     - name: Clone U-Boot
       run: 'mkdir -p build/uboot
 
