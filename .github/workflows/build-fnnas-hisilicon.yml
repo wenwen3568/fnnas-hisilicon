@@ -91,8 +91,25 @@ jobs:
       run: |
         mkdir -p build/base
         cd build/base
-        wget -c "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.gz" -O fnnas-base.img.gz
-        xz -d -k fnnas-base.img.gz
+        # Try multiple known URLs (ophub updates filenames occasionally)
+        BASE_URLS=(
+          "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.xz"
+          "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1253.img.xz"
+          "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.gz"
+        )
+        for url in "${BASE_URLS[@]}"; do
+          echo "Trying $url"
+          if wget -c "$url" -O fnnas-base.img.xz 2>/dev/null; then
+            echo "Downloaded: $url"
+            break
+          fi
+        done
+        # Decompress (handles both .xz and .gz)
+        if [[ -f fnnas-base.img.xz ]]; then
+          xz -d -k fnnas-base.img.xz
+        elif [[ -f fnnas-base.img.gz ]]; then
+          gzip -d -k fnnas-base.img.gz
+        fi
         echo "FNOS_BASE_IMAGE=$(pwd)/fnnas-base.img" >> $GITHUB_ENV
     - name: Clone Linux kernel
       run: |
