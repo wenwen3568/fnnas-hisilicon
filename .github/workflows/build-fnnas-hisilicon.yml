@@ -91,8 +91,8 @@ jobs:
       run: |
         mkdir -p build/base
         cd build/base
-        wget -c "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.xz" -O fnnas-base.img.xz
-        xz -d -k fnnas-base.img.xz
+        wget -c "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.gz" -O fnnas-base.img.gz
+        xz -d -k fnnas-base.img.gz
         echo "FNOS_BASE_IMAGE=$(pwd)/fnnas-base.img" >> $GITHUB_ENV
     - name: Clone Linux kernel
       run: |
@@ -337,15 +337,15 @@ jobs:
         sudo mkdir -p build/image_mnt/root/boot
         sudo umount build/image_mnt/boot build/image_mnt/root
         sudo losetup -d $loop_dev
-        xz -T0 -9 "$image_path"
-        sha256sum "${image_path}.xz" > "${image_path}.xz.sha256"
-        echo "IMAGE_PATH=${image_path}.xz" >> $GITHUB_ENV
-        echo "IMAGE_SHA256=$(cat ${image_path}.xz.sha256 | cut -d' ' -f1)" >> $GITHUB_ENV
+        gzip -6 "$image_path"
+        sha256sum "${image_path}.gz" > "${image_path}.gz.sha256"
+        echo "IMAGE_PATH=${image_path}.gz" >> $GITHUB_ENV
+        echo "IMAGE_SHA256=$(cat ${image_path}.gz.sha256 | cut -d' ' -f1)" >> $GITHUB_ENV
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
         name: fnnas-hisilicon-ec6100v9c-${{ github.event.inputs.kernel_version }}
-        path: out/*.img.xz*
+        path: out/*.img.gz*
         retention-days: 30
     - name: Create Release
       if: github.event_name == 'workflow_dispatch'
@@ -369,12 +369,12 @@ jobs:
           - Builder: ${{ github.event.inputs.builder_name }}
 
           **Installation:**
-          1. Download the .img.xz file
-          2. Decompress: xz -d fnnas_hisilicon_ec6100v9c_*.img.xz
+          1. Download the .img.gz file
+          2. Decompress: gzip -d fnnas_hisilicon_ec6100v9c_*.img.gz
           3. Write to USB/SD: sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress
           4. Boot from USB/SD, then run fnnas-install to flash to eMMC
         draft: false
         prerelease: true
         files: |
-          out/*.img.xz
-          out/*.sha256
+          out/*.img.gz
+          out/*.gz.sha256
