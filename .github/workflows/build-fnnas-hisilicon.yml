@@ -331,9 +331,12 @@ jobs:
         if [[ -f "$rootfs/boot/extlinux.conf" ]]; then
           sudo sed -i 's|fdt /boot/dtb/.*|fdt /boot/dtb/hisilicon/hi3798mv100-ec6100v9c.dtb|' "$rootfs/boot/extlinux.conf"
           sudo sed -i 's|linux /boot/Image|linux /boot/Image.gz|' "$rootfs/boot/extlinux.conf"
+          # Ensure bootargs include HDMI video output
+          sudo sed -i 's|append .*|append earlycon=pl011,mmio32,0xf8008b000000 console=ttyAMA0,115200n8 root=/dev/mmcblk0p2 rootfstype=btrfs rootwait video=HDMI-A-1:1920x1080@60|' "$rootfs/boot/extlinux.conf"
         fi
         if [[ -f "$rootfs/boot/uEnv.txt" ]]; then
           sudo sed -i 's|fdtfile=.*|fdtfile=hisilicon/hi3798mv100-ec6100v9c.dtb|' "$rootfs/boot/uEnv.txt"
+          sudo sed -i 's|bootargs=.*|bootargs=earlycon=pl011,mmio32,0xf8008b000000 console=ttyAMA0,115200n8 root=/dev/mmcblk0p2 rootfstype=btrfs rootwait video=HDMI-A-1:1920x1080@60|' "$rootfs/boot/uEnv.txt"
         fi
     - name: Create final image
       run: |
@@ -364,6 +367,19 @@ jobs:
         sha256sum "${image_path}.gz" > "${image_path}.gz.sha256"
         echo "IMAGE_PATH=${image_path}.gz" >> $GITHUB_ENV
         echo "IMAGE_SHA256=$(cat ${image_path}.gz.sha256 | cut -d' ' -f1)" >> $GITHUB_ENV
+    - name: Write U-Boot to image
+      run: |
+        set -euxo pipefail
+        cd build/uboot/u-boot
+        cat u-boot.bin ../../dtb/u-boot-ec6100v9c.dtb > u-boot-with-dtb.bin
+        IMAGE_FILE=$(ls ../../../out/fnnas_hisilicon_ec6100v9c_*.img.gz 2>/dev/null | head -1)
+        if [ -f "$IMAGE_FILE" ]; then
+          gzip -d -c "$IMAGE_FILE" > "${IMAGE_FILE%.gz}.tmp"
+          sudo dd if=u-boot-with-dtb.bin of="${IMAGE_FILE%.gz}.tmp" bs=512 seek=16384 conv=notrunc
+          gzip -6 -c "${IMAGE_FILE%.gz}.tmp" > "$IMAGE_FILE"
+          rm -f "${IMAGE_FILE%.gz}.tmp"
+          echo "U-Boot written to image at 8MB offset"
+        fi
     - name: Upload artifact
       uses: actions/upload-artifact@v4
       with:
