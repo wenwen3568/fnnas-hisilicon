@@ -289,6 +289,20 @@ static const struct hisi_gate_clock hi3798mv100_gate_clks[] = {
 	/* VPU */
 	{ HISTB_VPU_CLK, "clk_vpu", "200m",
 		CLK_SET_RATE_PARENT, 0x1b0, 0, 0, },
+	/* HDMI */
+	{ HISTB_HDMI_CLK, "clk_hdmi", "200m",
+		CLK_SET_RATE_PARENT, 0x1b0, 0, 0, },
+	{ HISTB_HDMI_CEC_CLK, "clk_hdmi_cec", "24m",
+		CLK_SET_RATE_PARENT, 0x1b0, 1, 0, },
+	{ HISTB_HDMI_I2S_CLK, "clk_hdmi_i2s", "24m",
+		CLK_SET_RATE_PARENT, 0x1b0, 2, 0, },
+	{ HISTB_HDMI_PHY_CLK, "clk_hdmi_phy", "24m",
+		CLK_SET_RATE_PARENT, 0x1b0, 3, 0, },
+	/* Display Controller */
+	{ HISTB_DISPLAY_CLK, "clk_display", "200m",
+		CLK_SET_RATE_PARENT, 0x1c0, 0, 0, },
+	{ HISTB_DISPLAY_VP_CLK, "clk_display_vp", "200m",
+		CLK_SET_RATE_PARENT, 0x1c0, 1, 0, },
 };
 
 static const struct hi3798_complex_clock hi3798mv100_complex_clks[] = {

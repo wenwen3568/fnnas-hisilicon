@@ -362,6 +362,78 @@
 			clock-names = "bus", "core";
 			status = "okay";
 		};
+
+		/* HDMI TX Controller */
+		hdmi: hdmi@9c60000 {
+			compatible = "hisilicon,hi3798mv100-hdmi", "hisilicon,hi3798mv200-hdmi";
+			reg = <0x9c60000 0x10000>;
+			interrupts = <GIC_SPI 114 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&crg HISTB_HDMI_CLK>,
+				 <&crg HISTB_HDMI_CEC_CLK>,
+				 <&crg HISTB_HDMI_I2S_CLK>;
+			clock-names = "hdmi", "cec", "i2s";
+			resets = <&crg 0x1b0 0>,
+				 <&crg 0x1b0 1>,
+				 <&crg 0x1b0 2>;
+			reset-names = "hdmi", "cec", "i2s";
+			status = "okay";
+
+			hdmi-phy: phy {
+				compatible = "hisilicon,hi3798mv100-hdmi-phy";
+				reg = <0x9c70000 0x10000>;
+				clocks = <&crg HISTB_HDMI_PHY_CLK>;
+				clock-names = "phy";
+				resets = <&crg 0x1b0 3>;
+				reset-names = "phy";
+				#phy-cells = <0>;
+				status = "okay";
+			};
+
+			hdmi-cec: cec {
+				compatible = "hisilicon,hi3798mv100-hdmi-cec";
+				reg = <0x9c68000 0x1000>;
+				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&crg HISTB_HDMI_CEC_CLK>;
+				clock-names = "cec";
+				resets = <&crg 0x1b0 1>;
+				reset-names = "cec";
+				status = "okay";
+			};
+
+			hdmi-audio: audio {
+				compatible = "hisilicon,hi3798mv100-hdmi-audio";
+				reg = <0x9c69000 0x1000>;
+				interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
+				clocks = <&crg HISTB_HDMI_I2S_CLK>;
+				clock-names = "i2s";
+				resets = <&crg 0x1b0 2>;
+				reset-names = "i2s";
+				status = "okay";
+			};
+		};
+
+		/* Display Controller (DRM/KMS) */
+		display: display@9c80000 {
+			compatible = "hisilicon,hi3798mv100-display", "hisilicon,hi3798mv200-display";
+			reg = <0x9c80000 0x20000>;
+			interrupts = <GIC_SPI 117 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&crg HISTB_DISPLAY_CLK>,
+				 <&crg HISTB_DISPLAY_VP_CLK>;
+			clock-names = "bus", "vp";
+			resets = <&crg 0x1c0 0>,
+				 <&crg 0x1c0 1>;
+			reset-names = "bus", "vp";
+			port {
+				#address-cells = <1>;
+				#size-cells = <0>;
+
+				hdmi_out: endpoint {
+					reg = <0>;
+					remote-endpoint = <&hdmi_in>;
+				};
+			};
+			status = "okay";
+		};
 	};
 
 	/* Memory - 1GB DDR3 */

@@ -199,6 +199,12 @@ jobs:
               print "#define HISTB_THERMAL_CLK		66"
               print "#define HISTB_CRYPTO_CLK		67"
               print "#define HISTB_VPU_CLK			68"
+              print "#define HISTB_HDMI_CLK			69"
+              print "#define HISTB_HDMI_CEC_CLK		70"
+              print "#define HISTB_HDMI_I2S_CLK		71"
+              print "#define HISTB_HDMI_PHY_CLK		72"
+              print "#define HISTB_DISPLAY_CLK		73"
+              print "#define HISTB_DISPLAY_VP_CLK		74"
               next
             }
             { print }
