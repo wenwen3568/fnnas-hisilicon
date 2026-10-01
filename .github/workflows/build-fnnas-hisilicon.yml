@@ -47,39 +47,39 @@ jobs:
     - name: Set up build environment
       run: |
         sudo apt-get update -y
-        sudo apt-get install -y \
-          gcc-aarch64-linux-gnu \
-          g++-aarch64-linux-gnu \
-          gcc-arm-linux-gnueabihf \
-          g++-arm-linux-gnueabihf \
-          make \
-          bc \
-          bison \
-          flex \
-          libssl-dev \
-          libelf-dev \
-          device-tree-compiler \
-          u-boot-tools \
-          parted \
-          dosfstools \
-          e2fsprogs \
-          btrfs-progs \
-          xz-utils \
-          curl \
-          wget \
-          git \
-          python3 \
-          python3-pip \
-          qemu-user-static \
-          binfmt-support \
-          debootstrap \
-          debian-archive-keyring \
-          cpio \
-          zstd \
-          lz4 \
-          pigz \
-          rsync \
-          patch \
+        sudo apt-get install -y \\
+          gcc-aarch64-linux-gnu \\
+          g++-aarch64-linux-gnu \\
+          gcc-arm-linux-gnueabihf \\
+          g++-arm-linux-gnueabihf \\
+          make \\
+          bc \\
+          bison \\
+          flex \\
+          libssl-dev \\
+          libelf-dev \\
+          device-tree-compiler \\
+          u-boot-tools \\
+          parted \\
+          dosfstools \\
+          e2fsprogs \\
+          btrfs-progs \\
+          xz-utils \\
+          curl \\
+          wget \\
+          git \\
+          python3 \\
+          python3-pip \\
+          qemu-user-static \\
+          binfmt-support \\
+          debootstrap \\
+          debian-archive-keyring \\
+          cpio \\
+          zstd \\
+          lz4 \\
+          pigz \\
+          rsync \\
+          patch \\
           libgnutls28-dev
     - name: Determine kernel branch
       id: kernel_branch
@@ -88,29 +88,48 @@ jobs:
         BRANCH="v${KERNEL_VER%.y}"
         echo "branch=$BRANCH" >> $GITHUB_OUTPUT
     - name: Download base fnOS image
+      shell: bash
       run: |
+        set -euxo pipefail
         mkdir -p build/base
         cd build/base
-        # Try multiple known URLs (ophub updates filenames occasionally)
+
         BASE_URLS=(
           "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.xz"
           "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1253.img.xz"
           "https://github.com/ophub/fnnas/releases/download/fnnas_base_image/fnnas-official-arm64-image_amlogic_1252.img.gz"
         )
+
+        downloaded=0
         for url in "${BASE_URLS[@]}"; do
           echo "Trying $url"
-          if wget -c "$url" -O fnnas-base.img.xz 2>/dev/null; then
-            echo "Downloaded: $url"
+          if wget -c --tries=3 --timeout=30 -O fnnas-base.img.xz "$url"; then
+            downloaded=1
+            break
+          fi
+          if wget -c --tries=3 --timeout=30 -O fnnas-base.img.gz "$url"; then
+            downloaded=1
             break
           fi
         done
-        # Decompress (handles both .xz and .gz)
-        if [[ -f fnnas-base.img.xz ]]; then
-          xz -d -k fnnas-base.img.xz
-        elif [[ -f fnnas-base.img.gz ]]; then
-          gzip -d -k fnnas-base.img.gz
+
+        if [ "$downloaded" -ne 1 ]; then
+          echo "ERROR: failed to download base fnOS image from all known URLs"
+          exit 1
         fi
-        echo "FNOS_BASE_IMAGE=$(pwd)/fnnas-base.img" >> $GITHUB_ENV
+
+        if [[ -f fnnas-base.img.xz ]]; then
+          xz -d -k -f fnnas-base.img.xz
+        elif [[ -f fnnas-base.img.gz ]]; then
+          gzip -d -k -f fnnas-base.img.gz
+        fi
+
+        if [[ ! -f fnnas-base.img ]]; then
+          echo "ERROR: base image decompression failed"
+          exit 1
+        fi
+
+        echo "FNOS_BASE_IMAGE=$(pwd)/fnnas-base.img" >> "$GITHUB_ENV"
     - name: Clone Linux kernel
       run: |
         mkdir -p build/kernel
@@ -171,7 +190,7 @@ jobs:
         echo "=== DTS makefile ==="
         grep -n "hi3798mv100-ec6100v9c" "$KERNEL/arch/arm64/boot/dts/Makefile" || true
         grep -n "hi3798mv100-ec6100v9c" "$KERNEL/arch/arm64/boot/dts/hisilicon/Makefile" || true
-    - name: Apply Hi3798MV100 DT bindings (add missing clocks 64-68)
+    - name: Apply Hi3798MV100 DT bindings (add missing clocks 51-74)
       run: |
         cd build/kernel/linux
         if ! grep -q 'hisilicon,hi3798mv100-crg' Documentation/devicetree/bindings/clock/hisi-crg.txt; then
@@ -181,30 +200,30 @@ jobs:
           awk '
             /HISTB_USB3_SUSPEND_CLK1/ {
               print
-              print "#define HISTB_USB2_UTMI_CLK1		51"
-              print "#define HISTB_USB2_2_BUS_CLK		52"
-              print "#define HISTB_USB2_2_PHY_CLK		53"
-              print "#define HISTB_USB2_2_UTMI_CLK		54"
-              print "#define HISTB_USB2_2_UTMI_CLK1		55"
-              print "#define HISTB_USB2_2_12M_CLK		56"
-              print "#define HISTB_USB2_2_48M_CLK		57"
-              print "#define HISTB_USB2_2_OTG_UTMI_CLK	58"
-              print "#define HISTB_USB2_2_PHY1_REF_CLK	59"
-              print "#define HISTB_USB2_2_PHY2_REF_CLK	60"
-              print "#define HISTB_FEPHY_CLK			61"
-              print "#define HISTB_GPU_BUS_CLK		62"
-              print "#define HISTB_GPU_CORE_CLK		63"
-              print "#define HISTB_WDT_CLK			64"
-              print "#define HISTB_RTC_CLK			65"
-              print "#define HISTB_THERMAL_CLK		66"
-              print "#define HISTB_CRYPTO_CLK		67"
-              print "#define HISTB_VPU_CLK			68"
-              print "#define HISTB_HDMI_CLK			69"
-              print "#define HISTB_HDMI_CEC_CLK		70"
-              print "#define HISTB_HDMI_I2S_CLK		71"
-              print "#define HISTB_HDMI_PHY_CLK		72"
-              print "#define HISTB_DISPLAY_CLK		73"
-              print "#define HISTB_DISPLAY_VP_CLK		74"
+              print "#define HISTB_USB2_UTMI_CLK1\t\t51"
+              print "#define HISTB_USB2_2_BUS_CLK\t\t52"
+              print "#define HISTB_USB2_2_PHY_CLK\t\t53"
+              print "#define HISTB_USB2_2_UTMI_CLK\t\t54"
+              print "#define HISTB_USB2_2_UTMI_CLK1\t\t55"
+              print "#define HISTB_USB2_2_12M_CLK\t\t56"
+              print "#define HISTB_USB2_2_48M_CLK\t\t57"
+              print "#define HISTB_USB2_2_OTG_UTMI_CLK\t58"
+              print "#define HISTB_USB2_2_PHY1_REF_CLK\t59"
+              print "#define HISTB_USB2_2_PHY2_REF_CLK\t60"
+              print "#define HISTB_FEPHY_CLK\t\t\t61"
+              print "#define HISTB_GPU_BUS_CLK\t\t62"
+              print "#define HISTB_GPU_CORE_CLK\t\t63"
+              print "#define HISTB_WDT_CLK\t\t\t64"
+              print "#define HISTB_RTC_CLK\t\t\t65"
+              print "#define HISTB_THERMAL_CLK\t\t66"
+              print "#define HISTB_CRYPTO_CLK\t\t67"
+              print "#define HISTB_VPU_CLK\t\t\t68"
+              print "#define HISTB_HDMI_CLK\t\t\t69"
+              print "#define HISTB_HDMI_CEC_CLK\t\t70"
+              print "#define HISTB_HDMI_I2S_CLK\t\t71"
+              print "#define HISTB_HDMI_PHY_CLK\t\t72"
+              print "#define HISTB_DISPLAY_CLK\t\t73"
+              print "#define HISTB_DISPLAY_VP_CLK\t\t74"
               next
             }
             { print }
@@ -213,7 +232,7 @@ jobs:
         fi
         echo "=== Verifying DT bindings ==="
         grep -n "hisilicon,hi3798mv100" Documentation/devicetree/bindings/clock/hisi-crg.txt || true
-        grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU\|HISTB_WDT\|HISTB_RTC\|HISTB_THERMAL\|HISTB_CRYPTO\|HISTB_VPU" include/dt-bindings/clock/histb-clock.h || true
+        grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU\|HISTB_WDT\|HISTB_RTC\|HISTB_THERMAL\|HISTB_CRYPTO\|HISTB_VPU\|HISTB_HDMI\|HISTB_DISPLAY" include/dt-bindings/clock/histb-clock.h || true
     - name: Build Linux kernel
       run: |
         set -euxo pipefail
@@ -235,7 +254,7 @@ jobs:
         BUILD_RC=${PIPESTATUS[0]}
         if [ $BUILD_RC -ne 0 ]; then
           echo "=== BUILD FAILED - FULL BUILD LOG ==="
-          sed -n "1,400p" build_full.log || true
+          sed -n '1,400p' build_full.log || true
           exit $BUILD_RC
         fi
 
@@ -254,11 +273,11 @@ jobs:
         cp "$DTB_SRC" "${GITHUB_WORKSPACE}/build/dtb/"
 
         # Install modules into the rootfs (check result; modules were built earlier)
-        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH=../rootfs modules_install 2>&1 | tee modules_install.log
+        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="${GITHUB_WORKSPACE}/build/rootfs" modules_install 2>&1 | tee modules_install.log
         MI_RC=${PIPESTATUS[0]}
         if [ $MI_RC -ne 0 ]; then
           echo "=== MODULES INSTALL FAILED ==="
-          sed -n "1,400p" modules_install.log || true
+          sed -n '1,400p' modules_install.log || true
           exit $MI_RC
         fi
 
@@ -311,9 +330,15 @@ jobs:
         ls -la ../../../dtb/u-boot-ec6100v9c.dtb
     - name: Extract base fnOS image
       run: |
+        set -euxo pipefail
+        if [[ ! -f "$FNOS_BASE_IMAGE" ]]; then
+          echo "ERROR: FNOS_BASE_IMAGE is missing: $FNOS_BASE_IMAGE"
+          exit 1
+        fi
+
         mkdir -p build/extract
         cd build/extract
-        loop_dev=$(sudo losetup -fP --show $FNOS_BASE_IMAGE)
+        loop_dev=$(sudo losetup -fP --show "$FNOS_BASE_IMAGE")
         mkdir -p boot root
         sudo mount "${loop_dev}p1" boot
         sudo mount "${loop_dev}p2" root -t btrfs -o compress=zstd:1
@@ -322,7 +347,8 @@ jobs:
         sudo losetup -d $loop_dev
     - name: Replace kernel and DTB
       run: |
-        rootfs="build/rootfs"
+        set -euxo pipefail
+        rootfs="${GITHUB_WORKSPACE}/build/rootfs"
         sudo mv "$rootfs/boot/Image.gz" "$rootfs/boot/Image.gz.bak" 2>/dev/null || true
         sudo cp build/kernel/linux/arch/arm64/boot/Image.gz "$rootfs/boot/Image.gz"
         sudo mkdir -p "$rootfs/boot/dtb/hisilicon"
@@ -340,6 +366,7 @@ jobs:
         fi
     - name: Create final image
       run: |
+        set -euxo pipefail
         mkdir -p out
         image_name="fnos_hisilicon_ec6100v9c_$(date +%Y%m%d_%H%M%S).img"
         image_path="out/$image_name"
