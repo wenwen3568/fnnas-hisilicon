@@ -46,41 +46,44 @@ jobs:
       uses: actions/checkout@v4
     - name: Set up build environment
       run: |
+        set -euxo pipefail
         sudo apt-get update -y
-        sudo apt-get install -y \\
-          gcc-aarch64-linux-gnu \\
-          g++-aarch64-linux-gnu \\
-          gcc-arm-linux-gnueabihf \\
-          g++-arm-linux-gnueabihf \\
-          make \\
-          bc \\
-          bison \\
-          flex \\
-          libssl-dev \\
-          libelf-dev \\
-          device-tree-compiler \\
-          u-boot-tools \\
-          parted \\
-          dosfstools \\
-          e2fsprogs \\
-          btrfs-progs \\
-          xz-utils \\
-          curl \\
-          wget \\
-          git \\
-          python3 \\
-          python3-pip \\
-          qemu-user-static \\
-          binfmt-support \\
-          debootstrap \\
-          debian-archive-keyring \\
-          cpio \\
-          zstd \\
-          lz4 \\
-          pigz \\
-          rsync \\
-          patch \\
+        PACKAGES=(
+          gcc-aarch64-linux-gnu
+          g++-aarch64-linux-gnu
+          gcc-arm-linux-gnueabihf
+          g++-arm-linux-gnueabihf
+          make
+          bc
+          bison
+          flex
+          libssl-dev
+          libelf-dev
+          device-tree-compiler
+          u-boot-tools
+          parted
+          dosfstools
+          e2fsprogs
+          btrfs-progs
+          xz-utils
+          curl
+          wget
+          git
+          python3
+          python3-pip
+          qemu-user-static
+          binfmt-support
+          debootstrap
+          debian-archive-keyring
+          cpio
+          zstd
+          lz4
+          pigz
+          rsync
+          patch
           libgnutls28-dev
+        )
+        sudo apt-get install -y "${PACKAGES[@]}"
     - name: Determine kernel branch
       id: kernel_branch
       run: |
