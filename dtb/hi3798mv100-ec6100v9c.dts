@@ -74,12 +74,12 @@
 		};
 	};
 
-	gic: interrupt-controller@f1001000 {
+	gic: interrupt-controller@f8a01000 {
 		compatible = "arm,gic-400";
-		reg = <0x0 0xf1001000 0x0 0x1000>,  /* GICD */
-		      <0x0 0xf1002000 0x0 0x100>,   /* GICC */
-		      <0x0 0xf1004000 0x0 0x2000>,  /* GICH */
-		      <0x0 0xf1006000 0x0 0x2000>;  /* GICV */
+		reg = <0x0 0xf8a01000 0x0 0x1000>,  /* GICD */
+		      <0x0 0xf8a02000 0x0 0x100>,   /* GICC */
+		      <0x0 0xf8a04000 0x0 0x2000>,  /* GICH */
+		      <0x0 0xf8a06000 0x0 0x2000>;  /* GICV */
 		interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) |
 			      IRQ_TYPE_LEVEL_HIGH)>;
 		#address-cells = <0>;
@@ -128,9 +128,9 @@
 			#reset-cells = <2>;
 		};
 
-		sysctrl: system-controller@8000000 {
+		sysctrl: system-controller@8a20000 {
 			compatible = "hisilicon,hi3798mv100-sysctrl", "syscon";
-			reg = <0x8000000 0x1000>;
+			reg = <0x8a20000 0x1000>;
 			#clock-cells = <1>;
 			#reset-cells = <2>;
 		};
@@ -190,6 +190,58 @@
 			clocks = <&crg HISTB_UART2_CLK>;
 			clock-names = "apb_pclk";
 			status = "disabled";
+		};
+
+		/* I2C0 */
+		i2c0: i2c@8b10000 {
+			compatible = "hisilicon,hi-i2c";
+			reg = <0x8b10000 0x1000>;
+			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
+			clock-frequency = <100000>;
+			clocks = <&crg HISTB_I2C0_CLK>;
+			clock-names = "apb_pclk";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+		};
+
+		/* I2C1 */
+		i2c1: i2c@8b11000 {
+			compatible = "hisilicon,hi-i2c";
+			reg = <0x8b11000 0x1000>;
+			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>;
+			clock-frequency = <100000>;
+			clocks = <&crg HISTB_I2C1_CLK>;
+			clock-names = "apb_pclk";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+		};
+
+		/* I2C2 */
+		i2c2: i2c@8b12000 {
+			compatible = "hisilicon,hi-i2c";
+			reg = <0x8b12000 0x1000>;
+			interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>;
+			clock-frequency = <100000>;
+			clocks = <&crg HISTB_I2C2_CLK>;
+			clock-names = "apb_pclk";
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "okay";
+		};
+
+		/* SPI0 */
+		spi0: spi@8b1a000 {
+			compatible = "arm,pl022", "arm,primecell";
+			reg = <0x8b1a000 0x1000>;
+			interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+			num-cs = <2>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			clocks = <&crg HISTB_SPI0_CLK>;
+			clock-names = "apb_pclk";
+			status = "okay";
 		};
 
 		/* SD/SDIO0 - Usually for SD card */
@@ -303,6 +355,33 @@
 			clock-names = "bus", "clk12", "clk48";
 			resets = <&crg 0x198 11>;
 			reset-names = "bus";
+			status = "okay";
+		};
+
+		/* IR Remote */
+		ir: ir@8001000 {
+			compatible = "hisilicon,hix5hd2-ir";
+			reg = <0x8001000 0x1000>;
+			interrupts = <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&sysctrl HISTB_IR_CLK>;
+			linux,rc-map-name = "rc-hisi";
+			status = "okay";
+		};
+
+		/* Vendor Timer (HiSP804) */
+		timer_hisp804: timer@8a29000 {
+			compatible = "hisilicon,hisp804";
+			reg = <0x8a29000 0x20>,
+			      <0x8a2a000 0x20>,
+			      <0x8a2a020 0x20>,
+			      <0x8a2b000 0x20>,
+			      <0x8a2b020 0x20>;
+			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
+				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&sysctrl HISTB_TIMER01_CLK>;
+			clock-names = "apb_pclk";
 			status = "okay";
 		};
 
