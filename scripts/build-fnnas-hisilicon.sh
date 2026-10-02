@@ -26,6 +26,7 @@ DTB_DIR="$PROJECT_ROOT/dtb"
 BUILD_DIR="$PROJECT_ROOT/build"
 OUTPUT_DIR="$PROJECT_ROOT/out"
 PATCHES_DIR="$KERNEL_DIR/patches"
+PREBUILT_DIR="$PROJECT_ROOT/prebuilt/mv100-ec6100v9c"
 
 # Default configuration
 BOARD="ec6100v9c"
@@ -36,6 +37,10 @@ ROOTFS_SIZE_MB=6144
 BOOTFS_SIZE_MB=512
 ROOTFS_EXPAND_GB=16
 BUILDER_NAME="fnnas-hisilicon-$(whoami)"
+
+# Build options
+USE_PREBUILT_KERNEL=false
+USE_PREBUILT_HDMI=true
 
 # Base fnOS image
 FNOS_BASE_IMAGE=""
@@ -71,6 +76,28 @@ download_base_image() {
 }
 
 build_kernel() {
+    if [[ "$USE_PREBUILT_KERNEL" == "true" ]]; then
+        process_msg "Using prebuilt vendor kernel (hi_kernel.bin)..."
+        mkdir -p "$BUILD_DIR/kernel"
+        if [[ -f "$PREBUILT_DIR/hi_kernel.bin" ]]; then
+            cp "$PREBUILT_DIR/hi_kernel.bin" "$BUILD_DIR/kernel/Image.gz"
+            success_msg "Prebuilt kernel copied: $BUILD_DIR/kernel/Image.gz"
+            
+            # Extract modules from prebuilt kernel if available
+            # For now, we still need to build modules from source
+            warning_msg "Prebuilt kernel used - modules still need to be built from source"
+            build_kernel_modules_only
+        else
+            warning_msg "Prebuilt kernel not found, falling back to source build"
+            USE_PREBUILT_KERNEL=false
+            build_kernel_from_source
+        fi
+    else
+        build_kernel_from_source
+    fi
+}
+
+build_kernel_from_source() {
     process_msg "Building Linux kernel for Hi3798MV100 (应用David Yang v7补丁)..."
     mkdir -p "$BUILD_DIR/kernel"; cd "$BUILD_DIR/kernel"
     [[ ! -d "linux" ]] && git clone --depth=1 --branch "v${KERNEL_VERSION%.*}" "$KERNEL_REPO" linux
@@ -89,6 +116,25 @@ build_kernel() {
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j$(nproc) dtbs
     make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="$BUILD_DIR/kernel/rootfs" modules_install
     success_msg "Kernel build complete"
+}
+
+build_kernel_modules_only() {
+    process_msg "Building kernel modules for prebuilt kernel..."
+    mkdir -p "$BUILD_DIR/kernel"; cd "$BUILD_DIR/kernel"
+    [[ ! -d "linux" ]] && git clone --depth=1 --branch "v${KERNEL_VERSION%.*}" "$KERNEL_REPO" linux
+    cd linux
+    
+    process_msg "Applying Hi3798MV100 kernel patches..."
+    if [[ -d "$PATCHES_DIR" ]]; then
+        for patch in "$PATCHES_DIR"/*.patch; do
+            [[ -f "$patch" ]] && { info_msg "Applying $(basename "$patch")..."; patch -p1 < "$patch" 2>/dev/null || warning_msg "Patch $(basename "$patch") may have issues"; }
+        done
+    fi
+    
+    cp "$KERNEL_DIR/config-hi3798mv100" .config
+    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- olddefconfig
+    make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="$BUILD_DIR/kernel/rootfs" modules_install
+    success_msg "Kernel modules build complete"
 }
 
 build_uboot() {
@@ -114,6 +160,54 @@ build_dtbs() {
     success_msg "DTB build complete"
 }
 
+integrate_prebuilt_hdmi() {
+    if [[ "$USE_PREBUILT_HDMI" == "true" ]] && [[ -d "$PREBUILT_DIR" ]]; then
+        process_msg "Integrating prebuilt HDMI display configuration..."
+        local rootfs="$BUILD_DIR/rootfs"
+        
+        # Copy pq_param.bin to rootfs for HDMI display adaptation
+        if [[ -f "$PREBUILT_DIR/pq_param.bin" ]]; then
+            mkdir -p "$rootfs/lib/firmware/hisilicon"
+            cp "$PREBUILT_DIR/pq_param.bin" "$rootfs/lib/firmware/hisilicon/pq_param.bin"
+            success_msg "HDMI PQ params installed: $rootfs/lib/firmware/hisilicon/pq_param.bin"
+        else
+            warning_msg "pq_param.bin not found in prebuilt directory"
+        fi
+        
+        # Copy logo.img to boot partition
+        if [[ -f "$PREBUILT_DIR/logo.img" ]]; then
+            mkdir -p "$rootfs/boot"
+            cp "$PREBUILT_DIR/logo.img" "$rootfs/boot/logo.img"
+            success_msg "Boot logo installed: $rootfs/boot/logo.img"
+        else
+            warning_msg "logo.img not found in prebuilt directory"
+        fi
+        
+        # Copy bootargs.bin as reference (vendor boot arguments)
+        if [[ -f "$PREBUILT_DIR/bootargs.bin" ]]; then
+            mkdir -p "$rootfs/boot"
+            cp "$PREBUILT_DIR/bootargs.bin" "$rootfs/boot/bootargs_vendor.bin"
+            info_msg "Vendor bootargs saved as reference: $rootfs/boot/bootargs_vendor.bin"
+        fi
+        
+        # Copy fastboot.bin as reference
+        if [[ -f "$PREBUILT_DIR/fastboot.bin" ]]; then
+            mkdir -p "$rootfs/boot"
+            cp "$PREBUILT_DIR/fastboot.bin" "$rootfs/boot/fastboot_vendor.bin"
+            info_msg "Vendor fastboot saved as reference: $rootfs/boot/fastboot_vendor.bin"
+        fi
+        
+        # Copy baseparam.img as reference
+        if [[ -f "$PREBUILT_DIR/baseparam.img" ]]; then
+            mkdir -p "$rootfs/boot"
+            cp "$PREBUILT_DIR/baseparam.img" "$rootfs/boot/baseparam_vendor.img"
+            info_msg "Vendor baseparam saved as reference: $rootfs/boot/baseparam_vendor.img"
+        fi
+        
+        success_msg "Prebuilt HDMI/Display integration complete"
+    fi
+}
+
 extract_base_image() {
     process_msg "Extracting base fnOS image..."
     mkdir -p "$BUILD_DIR/extract"; cd "$BUILD_DIR/extract"
@@ -135,8 +229,14 @@ replace_kernel_dtb() {
     [[ -f "$rootfs/boot/Image.gz" ]] && mv "$rootfs/boot/Image.gz" "$rootfs/boot/Image.gz.bak"
     [[ -f "$rootfs/boot/Image" ]] && mv "$rootfs/boot/Image" "$rootfs/boot/Image.bak"
     
-    # Copy new kernel
-    cp "$BUILD_DIR/kernel/linux/arch/arm64/boot/Image.gz" "$rootfs/boot/Image.gz"
+    # Copy new kernel (either built or prebuilt)
+    if [[ -f "$BUILD_DIR/kernel/Image.gz" ]]; then
+        cp "$BUILD_DIR/kernel/Image.gz" "$rootfs/boot/Image.gz"
+    elif [[ -f "$BUILD_DIR/kernel/linux/arch/arm64/boot/Image.gz" ]]; then
+        cp "$BUILD_DIR/kernel/linux/arch/arm64/boot/Image.gz" "$rootfs/boot/Image.gz"
+    else
+        error_msg "Kernel image not found!"
+    fi
     
     # Copy DTBs
     mkdir -p "$rootfs/boot/dtb/hisilicon"
@@ -185,6 +285,9 @@ UENVEOF
     
     # Install firmware
     [[ -d "$BUILD_DIR/kernel/linux/firmware" ]] && rsync -a "$BUILD_DIR/kernel/linux/firmware/" "$rootfs/lib/firmware/"
+    
+    # ===== 集成预编译HDMI显示配置 =====
+    integrate_prebuilt_hdmi
     
     # ===== 强化 initramfs 生成 =====
     process_msg "Creating initramfs with Hi3798MV100 drivers..."
@@ -241,7 +344,7 @@ MODULESEOF
     # Verify initramfs exists
     [[ -f "$rootfs/boot/initramfs.img" ]] && success_msg "initramfs created: $(du -h $rootfs/boot/initramfs.img | cut -f1)"
     
-    success_msg "Kernel, DTB, boot config, and initramfs ready"
+    success_msg "Kernel, DTB, boot config, HDMI config, and initramfs ready"
 }
 
 create_image() {
@@ -286,6 +389,14 @@ create_image() {
     echo "  分区2 (ROOTFS): BTRFS, ${ROOTFS_SIZE_MB}MB+, 根文件系统"
     echo ""; echo "启动参数: console=ttyAMA0,115200n8 earlycon=pl011,mmio32,0xf8b00000"
     echo "  UART物理地址: 0xf8b00000 (SOC 0xf0000000 + 0x8b00000)"
+    if [[ "$USE_PREBUILT_KERNEL" == "true" ]]; then
+        echo "  内核: 预编译厂商内核 (hi_kernel.bin)"
+    else
+        echo "  内核: 源码编译 (Linux $KERNEL_VERSION + David Yang v7补丁)"
+    fi
+    if [[ "$USE_PREBUILT_HDMI" == "true" ]]; then
+        echo "  HDMI显示: 厂商pq_param.bin + logo.img 已集成"
+    fi
     echo "============================================"
 }
 
@@ -303,10 +414,31 @@ main() {
             -b|--board) BOARD="$2"; shift 2 ;;
             -s|--size) ROOTFS_SIZE_MB="$2"; shift 2 ;;
             -n|--name) BUILDER_NAME="$2"; shift 2 ;;
-            -h|--help) echo "Usage: $0 [-k kernel] [-b board] [-s size] [-n name]"; exit 0 ;;
+            --prebuilt-kernel) USE_PREBUILT_KERNEL=true; shift ;;
+            --no-prebuilt-hdmi) USE_PREBUILT_HDMI=false; shift ;;
+            -h|--help) 
+                echo "Usage: $0 [options]"
+                echo "  -k, --kernel VERSION     Kernel version (default: 6.6.y)"
+                echo "  -b, --board BOARD        Target board (default: ec6100v9c)"
+                echo "  -s, --size SIZE_MB       Rootfs size in MB (default: 6144)"
+                echo "  -n, --name NAME          Builder name"
+                echo "  --prebuilt-kernel        Use prebuilt vendor kernel (hi_kernel.bin)"
+                echo "  --no-prebuilt-hdmi       Disable prebuilt HDMI config integration"
+                echo "  -h, --help               Show this help"
+                exit 0 ;;
             *) error_msg "Unknown option: $1" ;;
         esac
     done
+    
+    # Check prebuilt directory
+    if [[ "$USE_PREBUILT_KERNEL" == "true" ]] || [[ "$USE_PREBUILT_HDMI" == "true" ]]; then
+        if [[ ! -d "$PREBUILT_DIR" ]]; then
+            warning_msg "Prebuilt directory not found: $PREBUILT_DIR"
+            warning_msg "Run extract-prebuilt.sh first or disable prebuilt options"
+            USE_PREBUILT_KERNEL=false
+            USE_PREBUILT_HDMI=false
+        fi
+    fi
     
     mkdir -p "$BUILD_DIR" "$OUTPUT_DIR"
     install_dependencies
