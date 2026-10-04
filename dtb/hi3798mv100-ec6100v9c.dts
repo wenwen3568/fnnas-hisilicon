@@ -455,7 +455,6 @@
 				 <&crg 0x1b0 1>,
 				 <&crg 0x1b0 2>;
 			reset-names = "hdmi", "cec", "i2s";
-			phys = <&hdmi-phy>;
 			status = "okay";
 			#address-cells = <1>;
 			#size-cells = <0>;
