@@ -471,7 +471,7 @@
 				};
 			};
 
-			hdmi-phy: phy {
+			hdmi_phy: phy {
 				compatible = "hisilicon,hi3798mv100-hdmi-phy";
 				reg = <0x9c70000 0x10000>;
 				clocks = <&crg HISTB_HDMI_PHY_CLK>;
@@ -482,7 +482,7 @@
 				status = "okay";
 			};
 
-			hdmi-cec: cec {
+			hdmi_cec: cec {
 				compatible = "hisilicon,hi3798mv100-hdmi-cec";
 				reg = <0x9c68000 0x1000>;
 				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
@@ -493,7 +493,7 @@
 				status = "okay";
 			};
 
-			hdmi-audio: audio {
+			hdmi_audio: audio {
 				compatible = "hisilicon,hi3798mv100-hdmi-audio";
 				reg = <0x9c69000 0x1000>;
 				interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
