@@ -455,8 +455,8 @@ main() {
     echo "Output: $OUTPUT_DIR"
     ls -la "$OUTPUT_DIR"/*.img.xz 2>/dev/null || true
     echo ""; echo "使用方法:"
-    echo "  1. 解压: xz -d fnnas_hisilicon_ec6100v9c_*.img.xz"
-    echo "  2. 写入U盘: sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress conv=fsync"
+    echo "  1. 解压: xz -d fnos_hisilicon_ec6100v9c_*.img.xz"
+    echo "  2. 写入U盘: sudo dd if=fnos_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress conv=fsync"
     echo "  3. 插入EC6100V9C USB口，上电启动 (TTL 115200 8N1)"
     echo "  4. 进入系统后: sudo fnnas-install  # 安装到eMMC"
     echo "============================================"

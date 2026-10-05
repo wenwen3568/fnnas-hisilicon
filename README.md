@@ -125,13 +125,13 @@ sudo ./scripts/build-fnnas-hisilicon.sh -k 6.6.y -b ec6100v9c -s 6144 -n myname
 
 ```bash
 # 1. 解压镜像
-xz -d fnnas_hisilicon_ec6100v9c_*.img.xz
+xz -d fnos_hisilicon_ec6100v9c_*.img.xz
 
 # 2. 写入 U盘 (替换 /dev/sdX 为实际设备，如 /dev/sdb)
-sudo ./scripts/flash-image.sh fnnas_hisilicon_ec6100v9c_*.img /dev/sdX
+sudo ./scripts/flash-image.sh fnos_hisilicon_ec6100v9c_*.img /dev/sdX
 
 # 或手动 dd (加上 conv=fsync 确保数据落盘)
-sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress conv=fsync
+sudo dd if=fnos_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
 ### 启动步骤

@@ -25,7 +25,7 @@ if [[ -z "$IMAGE_FILE" || -z "$TARGET_DEVICE" ]]; then
     echo "Usage: sudo $0 <image.img.xz> <target-device>"
     echo ""
     echo "Example:"
-    echo "  sudo $0 fnnas_hisilicon_ec6100v9c_20240115.img.xz /dev/sdb"
+    echo "  sudo $0 fnos_hisilicon_ec6100v9c_20240115.img.xz /dev/sdb"
     echo ""
     echo "Available images:"
     ls -la *.img.xz 2>/dev/null || echo "  (none in current directory)"

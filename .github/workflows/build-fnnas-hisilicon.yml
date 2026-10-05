@@ -487,7 +487,19 @@ jobs:
         cat u-boot.bin "$DTB" > u-boot-with-dtb.bin
         ls -la u-boot.bin u-boot-with-dtb.bin
 
-        IMAGE_FILE=$(ls ../../../out/fnnas_hisilicon_ec6100v9c_*.img.gz 2>/dev/null | head -1)
+        # "Create final image" exports IMAGE_PATH through $GITHUB_ENV - prefer it
+        # over re-globbing. The old glob spelled fnos_ as fnnas_, matched nothing,
+        # and the failing `ls` under `set -o pipefail` aborted this step (exit 2).
+        IMAGE_FILE="${IMAGE_PATH:-}"
+        if [ -z "$IMAGE_FILE" ] || [ ! -f "$IMAGE_FILE" ]; then
+          IMAGE_FILE=$(ls -1 ../../../out/fnos_hisilicon_ec6100v9c_*.img.gz 2>/dev/null | head -1 || true)
+        fi
+        if [ -z "$IMAGE_FILE" ] || [ ! -f "$IMAGE_FILE" ]; then
+          echo "WARNING: no packed image found in out/ - skipping the U-Boot write"
+          ls -la ../../../out/ || true
+          exit 0
+        fi
+        echo "image: $IMAGE_FILE"
         if [ -f "$IMAGE_FILE" ]; then
           gzip -d -c "$IMAGE_FILE" > "${IMAGE_FILE%.gz}.tmp"
           # Guard: the write lands at byte 8 MiB (sector 16384). Partition 1 must
@@ -535,9 +547,21 @@ jobs:
 
           **Installation:**
           1. Download the .img.gz file
-          2. Decompress: gzip -d fnnas_hisilicon_ec6100v9c_*.img.gz
-          3. Write to USB/SD: sudo dd if=fnnas_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress
-          4. Boot from USB/SD, then run fnnas-install to flash to eMMC
+          2. Decompress: gzip -d fnos_hisilicon_ec6100v9c_*.img.gz
+          3. Write to USB/SD: sudo dd if=fnos_hisilicon_ec6100v9c_*.img of=/dev/sdX bs=4M status=progress
+
+          **Compatibility (please read):**
+          - The CPU must be 64-bit ARMv8 (AArch64) and have >= 2 GB RAM.
+            The EC6100V9C / Hi3798MV100 is 4x Cortex-A7 (ARMv7, no AArch64)
+            with 1 GB RAM, so this image **cannot boot on it**; fnOS ARM
+            requires a 64-bit CPU. For that board use the vendor-layout
+            packer: scripts/pack-ec6100v9c-image.sh
+          - No bootloader is embedded (the U-Boot written at 8 MiB is built
+            from am335x_evm_defconfig and is not usable on HiSilicon); the
+            stock bootloader already in eMMC is what boots the device.
+          - Kernel here is ${kernel_version} + Hi3798MV100 device tree; the
+            tested on-board drivers live in the vendor kernel
+            prebuilt/mv100-ec6100v9c/hi_kernel.bin.
         draft: false
         prerelease: true
         files: |
