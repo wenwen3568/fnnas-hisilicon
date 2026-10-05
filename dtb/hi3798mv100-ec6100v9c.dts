@@ -28,6 +28,9 @@
 	#size-cells = <2>;
 
 	model = "EC6100V9C STB (Hi3798MV100)";
+	aliases {
+		serial0 = &uart0;
+	};
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
@@ -293,6 +296,8 @@
 				 <&crg 0xcc 2>,
 				 <&crg 0xcc 5>;
 			reset-names = "mac_core", "mac_ifc", "phy";
+			#address-cells = <1>;
+			#size-cells = <0>;
 			phy-mode = "rgmii";
 			phy-handle = <&phy0>;
 			status = "okay";
@@ -457,7 +462,7 @@
 			reset-names = "hdmi", "cec", "i2s";
 			status = "okay";
 			#address-cells = <1>;
-			#size-cells = <0>;
+			#size-cells = <1>;
 
 			ports {
 				#address-cells = <1>;
@@ -471,7 +476,7 @@
 				};
 			};
 
-			hdmi_phy: phy {
+			hdmi_phy: phy@9c70000 {
 				compatible = "hisilicon,hi3798mv100-hdmi-phy";
 				reg = <0x9c70000 0x10000>;
 				clocks = <&crg HISTB_HDMI_PHY_CLK>;
@@ -482,7 +487,7 @@
 				status = "okay";
 			};
 
-			hdmi_cec: cec {
+			hdmi_cec: cec@9c68000 {
 				compatible = "hisilicon,hi3798mv100-hdmi-cec";
 				reg = <0x9c68000 0x1000>;
 				interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_HIGH>;
@@ -493,7 +498,7 @@
 				status = "okay";
 			};
 
-			hdmi_audio: audio {
+			hdmi_audio: audio@9c69000 {
 				compatible = "hisilicon,hi3798mv100-hdmi-audio";
 				reg = <0x9c69000 0x1000>;
 				interrupts = <GIC_SPI 116 IRQ_TYPE_LEVEL_HIGH>;
@@ -516,16 +521,12 @@
 			resets = <&crg 0x1c0 0>,
 				 <&crg 0x1c0 1>;
 			reset-names = "bus", "vp";
+			status = "okay";
 			port {
-				#address-cells = <1>;
-				#size-cells = <0>;
-
 				hdmi_out: endpoint {
-					reg = <0>;
 					remote-endpoint = <&hdmi_in>;
 				};
 			};
-			status = "okay";
 		};
 	};
 

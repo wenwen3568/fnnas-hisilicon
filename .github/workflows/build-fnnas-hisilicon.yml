@@ -236,6 +236,25 @@ jobs:
         echo "=== Verifying DT bindings ==="
         grep -n "hisilicon,hi3798mv100" Documentation/devicetree/bindings/clock/hisi-crg.txt || true
         grep -n "HISTB_USB2_2\|HISTB_FEPHY\|HISTB_GPU\|HISTB_WDT\|HISTB_RTC\|HISTB_THERMAL\|HISTB_CRYPTO\|HISTB_VPU\|HISTB_HDMI\|HISTB_DISPLAY" include/dt-bindings/clock/histb-clock.h || true
+    - name: Validate DTS syntax (fail fast, before kernel build)
+      run: |
+        set -euxo pipefail
+        KERNEL=build/kernel/linux
+        DTS="$KERNEL/arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dts"
+        sed -i 's/\r$//' "$DTS" || true
+        cpp -nostdinc -I "$KERNEL/include" -I "$KERNEL/arch/arm64/boot/dts" \
+            -undef -D__DTS__ -x assembler-with-cpp "$DTS" -o /tmp/ec6100v9c.pp.dts
+        if ! dtc -I dts -O dtb -o /tmp/ec6100v9c.dtb /tmp/ec6100v9c.pp.dts 2> /tmp/dtc.log; then
+          echo "=== DTS SYNTAX ERROR - dtc output ==="
+          cat /tmp/dtc.log
+          ERR_LINE=$(grep -oE ':[0-9]+' /tmp/dtc.log | head -1 | tr -d ':')
+          echo "=== context around line ${ERR_LINE:-1} of source DTS ==="
+          if [ -n "$ERR_LINE" ]; then
+            sed -n "$((ERR_LINE>15?ERR_LINE-15:1)),$((ERR_LINE+15))p" "$DTS"
+          fi
+          exit 1
+        fi
+        echo "DTS validated successfully"
     - name: Build Linux kernel
       run: |
         set -euxo pipefail
