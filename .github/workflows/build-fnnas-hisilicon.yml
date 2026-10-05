@@ -294,8 +294,13 @@ jobs:
         mkdir -p "${GITHUB_WORKSPACE}/build/dtb"
         cp "$DTB_SRC" "${GITHUB_WORKSPACE}/build/dtb/"
 
-        # Install modules into the rootfs (check result; modules were built earlier)
-        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="${GITHUB_WORKSPACE}/build/rootfs" modules_install 2>&1 | tee modules_install.log
+        # Stage the modules in build/kernel/rootfs - NOT build/rootfs.
+        # build/rootfs is produced later by the base-image extraction step, and
+        # the fnOS image ships /lib as a symlink (usr-merge): a lib/ directory
+        # already sitting there made rsync die with
+        # "could not make way for new symlink: lib" (exit 23).
+        # The "Replace kernel and DTB" step copies them from here.
+        make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- INSTALL_MOD_PATH="${GITHUB_WORKSPACE}/build/kernel/rootfs" modules_install 2>&1 | tee modules_install.log
         MI_RC=${PIPESTATUS[0]}
         if [ $MI_RC -ne 0 ]; then
           echo "=== MODULES INSTALL FAILED ==="
@@ -358,15 +363,34 @@ jobs:
           exit 1
         fi
 
+        ROOTFS_DIR="${GITHUB_WORKSPACE}/build/rootfs"
+        # Refuse to clean anything that is not this workspace's build/rootfs.
+        case "$ROOTFS_DIR" in
+          */build/rootfs) ;;
+          *) echo "ERROR: refusing to clean unexpected path: $ROOTFS_DIR"; exit 1 ;;
+        esac
+        # The destination must start empty: the image's /lib is a symlink, so a
+        # pre-existing build/rootfs/lib directory makes rsync fail with
+        # "could not make way for new symlink: lib" (exit 23).
+        sudo rm -rf "$ROOTFS_DIR"
+        mkdir -p "$ROOTFS_DIR"
+
         mkdir -p build/extract
         cd build/extract
         loop_dev=$(sudo losetup -fP --show "$FNOS_BASE_IMAGE")
         mkdir -p boot root
         sudo mount "${loop_dev}p1" boot
         sudo mount "${loop_dev}p2" root -t btrfs -o compress=zstd:1
-        sudo rsync -a root/ ../rootfs/
+        sudo rsync -a root/ "$ROOTFS_DIR/"
         sudo umount root boot
         sudo losetup -d $loop_dev
+
+        echo "=== extracted rootfs top level ==="
+        sudo ls -la "$ROOTFS_DIR" | head -30
+        if [[ ! -e "$ROOTFS_DIR/usr/bin" && ! -e "$ROOTFS_DIR/bin" ]]; then
+          echo "ERROR: extracted rootfs looks empty or incomplete: $ROOTFS_DIR"
+          exit 1
+        fi
     - name: Replace kernel and DTB
       run: |
         set -euxo pipefail
@@ -375,7 +399,21 @@ jobs:
         sudo cp build/kernel/linux/arch/arm64/boot/Image.gz "$rootfs/boot/Image.gz"
         sudo mkdir -p "$rootfs/boot/dtb/hisilicon"
         sudo cp build/dtb/hi3798mv100-ec6100v9c.dtb "$rootfs/boot/dtb/hisilicon/"
-        sudo rsync -a build/kernel/rootfs/lib/modules/ "$rootfs/lib/modules/"
+        # Copy the modules staged by the "Build Linux kernel" step. Note that
+        # $rootfs/lib is a symlink to usr/lib on this usr-merged rootfs; rsync
+        # resolves it, so the modules land in usr/lib/modules.
+        mods_src="${GITHUB_WORKSPACE}/build/kernel/rootfs/lib/modules"
+        if [[ ! -d "$mods_src" ]]; then
+          echo "ERROR: staged kernel modules not found at $mods_src"
+          exit 1
+        fi
+        sudo rsync -a "$mods_src/" "$rootfs/lib/modules/"
+        module_count=$(sudo find "$rootfs/lib/modules" -name '*.ko*' 2>/dev/null | wc -l || true)
+        echo "kernel modules now inside rootfs: $module_count"
+        if [[ "$module_count" -eq 0 ]]; then
+          echo "ERROR: no kernel modules ended up in $rootfs/lib/modules"
+          exit 1
+        fi
         if [[ -f "$rootfs/boot/extlinux.conf" ]]; then
           sudo sed -i 's|fdt /boot/dtb/.*|fdt /boot/dtb/hisilicon/hi3798mv100-ec6100v9c.dtb|' "$rootfs/boot/extlinux.conf"
           sudo sed -i 's|linux /boot/Image|linux /boot/Image.gz|' "$rootfs/boot/extlinux.conf"
