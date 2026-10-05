@@ -77,6 +77,15 @@
 		};
 	};
 
+	/*
+	 * GIC-400 base 0xf8a01000 - CONFIRMED against the vendor DTB extracted
+	 * from this board's hi_kernel.bin: reg = <0xf8a01000 0x1000
+	 * 0xf8a02000 0x100>.  Do not "correct" this to mainline hi3798cv200's
+	 * 0xf1001000 (different die) or hi6220's 0xf6801000.
+	 * GICH/GICV use the standard GIC-400 offsets (GICD+0x3000/+0x5000);
+	 * the vendor DTB omits them only because its kernel has no KVM,
+	 * while our config-hi3798mv100 sets CONFIG_KVM=y.
+	 */
 	gic: interrupt-controller@f8a01000 {
 		compatible = "arm,gic-400";
 		reg = <0x0 0xf8a01000 0x0 0x1000>,  /* GICD */
@@ -131,9 +140,16 @@
 			#reset-cells = <2>;
 		};
 
-		sysctrl: system-controller@8a20000 {
+		/*
+		 * System controller: CPU address 0xf8000000 (soc child 0x8000000),
+		 * i.e. the block the vendor DTB sits ir@f8001000 / gpio5@f8004000 /
+		 * uart@f8006000 on top of, same as mainline hi3798cv200.dtsi.
+		 * Do NOT put it at 0x8a20000 - that is perictrl (vendor:
+		 * hisilicon_clock reg = <0xf8a22000 0x200 0xf8a20000 0x848>).
+		 */
+		sysctrl: system-controller@8000000 {
 			compatible = "hisilicon,hi3798mv100-sysctrl", "syscon";
-			reg = <0x8a20000 0x1000>;
+			reg = <0x8000000 0x1000>;
 			#clock-cells = <1>;
 			#reset-cells = <2>;
 		};
@@ -175,20 +191,25 @@
 			status = "okay";
 		};
 
-		/* UART1 - Often used for Bluetooth or debug */
-		uart1: serial@8b10000 {
+		/*
+		 * UART1 - vendor DTB has it at 0xf8006000 (soc child 0x8006000),
+		 * 3MHz apb_pclk, GIC SPI 50. 0x8b10000 is i2c0's address.
+		 */
+		uart1: serial@8006000 {
 			compatible = "arm,pl011", "arm,primecell";
-			reg = <0x8b10000 0x1000>;
+			reg = <0x8006000 0x1000>;
 			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&crg HISTB_UART1_CLK>;
 			clock-names = "apb_pclk";
 			status = "okay";
 		};
 
-		/* UART2 */
-		uart2: serial@8b20000 {
+		/* UART2 - vendor DTB: uart@0xf8b02000 (soc child 0x8b02000),
+		 * 83.3MHz apb_pclk, GIC SPI 51; matches mainline uart2 node.
+		 * 0x8b20000 is gpio0's address on CV200/MV100. */
+		uart2: serial@8b02000 {
 			compatible = "arm,pl011", "arm,primecell";
-			reg = <0x8b20000 0x1000>;
+			reg = <0x8b02000 0x1000>;
 			interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&crg HISTB_UART2_CLK>;
 			clock-names = "apb_pclk";
