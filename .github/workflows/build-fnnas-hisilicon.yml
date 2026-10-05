@@ -352,9 +352,14 @@ jobs:
         # Verify DTB was generated
         ls -la arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb
         cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../../../dtb/
-        # Use kernel DTB for U-Boot as well (compatible)
+        # Use kernel DTB for U-Boot as well (compatible).
+        # Write it BOTH to the repository dtb/ and to build/dtb/, because the
+        # "Write U-Boot to image" step runs in build/uboot/u-boot and looks for
+        # ../../dtb/u-boot-ec6100v9c.dtb (= build/dtb/) - missing this copy is
+        # what previously failed with "cat: ... No such file or directory".
         cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../../../dtb/u-boot-ec6100v9c.dtb
-        ls -la ../../../dtb/u-boot-ec6100v9c.dtb
+        cp arch/arm64/boot/dts/hisilicon/hi3798mv100-ec6100v9c.dtb ../../../build/dtb/u-boot-ec6100v9c.dtb
+        ls -la ../../../dtb/u-boot-ec6100v9c.dtb ../../../build/dtb/u-boot-ec6100v9c.dtb
     - name: Extract base fnOS image
       run: |
         set -euxo pipefail
@@ -433,11 +438,17 @@ jobs:
         total_size_mb=$((512 + ${{ github.event.inputs.rootfs_size }} + 100))
         dd if=/dev/zero of="$image_path" bs=1M count=$total_size_mb status=progress
         parted -s "$image_path" mklabel gpt
-        parted -s "$image_path" mkpart primary fat32 1MiB $((512 + 1))MiB
+        # Reserve bytes 0-16MiB for the bootloader: "Write U-Boot to image"
+        # dd's U-Boot at byte offset 8MiB (sector 16384).  With partition 1
+        # starting at 1MiB that write fell INSIDE the FAT32 boot partition and
+        # destroyed the boot files, so the bootloader gap must be 16MiB wide.
+        # (partition 1 stays 512MiB: 16MiB..528MiB; partition 2 still gets
+        #  rootfs_size + 84 MiB, i.e. always larger than rootfs_size.)
+        parted -s "$image_path" mkpart primary fat32 16MiB $((512 + 16))MiB
         parted -s "$image_path" set 1 boot on
         parted -s "$image_path" set 1 esp on
         parted -s "$image_path" name 1 "BOOT"
-        parted -s "$image_path" mkpart primary btrfs $((512 + 1))MiB 100%
+        parted -s "$image_path" mkpart primary btrfs $((512 + 16))MiB 100%
         parted -s "$image_path" name 2 "ROOTFS"
         loop_dev=$(sudo losetup -fP --show "$image_path")
         sudo mkfs.vfat -F 32 -n "BOOT" "${loop_dev}p1"
@@ -458,14 +469,42 @@ jobs:
       run: |
         set -euxo pipefail
         cd build/uboot/u-boot
-        cat u-boot.bin ../../dtb/u-boot-ec6100v9c.dtb > u-boot-with-dtb.bin
+        # Locate the DTB. "Build Device Tree Blobs" now writes it into build/dtb/
+        # (this step's ../../dtb/) and into the repository dtb/ as a fallback.
+        DTB=""
+        for c in ../../dtb/u-boot-ec6100v9c.dtb \
+                 "${GITHUB_WORKSPACE}/dtb/u-boot-ec6100v9c.dtb" \
+                 "${GITHUB_WORKSPACE}/build/dtb/u-boot-ec6100v9c.dtb" \
+                 "${GITHUB_WORKSPACE}/build/dtb/hi3798mv100-ec6100v9c.dtb"; do
+          if [ -f "$c" ]; then DTB="$c"; break; fi
+        done
+        if [ -z "$DTB" ]; then
+          echo "ERROR: U-Boot DTB not found. DTB directories:"
+          ls -la ../../dtb "${GITHUB_WORKSPACE}/dtb" "${GITHUB_WORKSPACE}/build/dtb" 2>&1 || true
+          exit 1
+        fi
+        echo "Using DTB: $DTB"
+        cat u-boot.bin "$DTB" > u-boot-with-dtb.bin
+        ls -la u-boot.bin u-boot-with-dtb.bin
+
         IMAGE_FILE=$(ls ../../../out/fnnas_hisilicon_ec6100v9c_*.img.gz 2>/dev/null | head -1)
         if [ -f "$IMAGE_FILE" ]; then
           gzip -d -c "$IMAGE_FILE" > "${IMAGE_FILE%.gz}.tmp"
+          # Guard: the write lands at byte 8 MiB (sector 16384). Partition 1 must
+          # start after that, otherwise we overwrite the FAT32 boot files.
+          p1_start=$(parted -m -s "${IMAGE_FILE%.gz}.tmp" unit B print 2>/dev/null \
+                     | awk -F: '/^1:/{gsub(/B/,"",$2); print $2}' || true)
+          if [ -n "$p1_start" ] && [ $((16384 * 512)) -ge "$p1_start" ]; then
+            echo "ERROR: U-Boot offset 8388608 overlaps partition 1 (starts at ${p1_start} bytes)"
+            rm -f "${IMAGE_FILE%.gz}.tmp"
+            exit 1
+          fi
           sudo dd if=u-boot-with-dtb.bin of="${IMAGE_FILE%.gz}.tmp" bs=512 seek=16384 conv=notrunc
           gzip -6 -c "${IMAGE_FILE%.gz}.tmp" > "$IMAGE_FILE"
           rm -f "${IMAGE_FILE%.gz}.tmp"
-          echo "U-Boot written to image at 8MB offset"
+          echo "U-Boot written at 8MB offset (partition 1 starts at ${p1_start:-unknown} bytes)"
+        else
+          echo "WARNING: no image found in out/, skipping U-Boot write"
         fi
     - name: Upload artifact
       uses: actions/upload-artifact@v4
